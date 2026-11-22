@@ -24,7 +24,13 @@
     },
     "plugins": [
       "expo-router",
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "VetSOS usa tu ubicación para encontrar al veterinario de guardia más cercano."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

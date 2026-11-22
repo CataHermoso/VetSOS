@@ -20,7 +20,11 @@ export default function RootLayout() {
       >
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="owner/index" options={{ headerShown: false }} />
-        <Stack.Screen name="owner/emergency" options={{ title: 'Emergencia' }} />
+        <Stack.Screen name="owner/emergency" options={{ headerShown: false }} />
+        <Stack.Screen name="owner/setup" options={{ title: 'Tus datos' }} />
+        <Stack.Screen name="owner/confirm" options={{ title: 'Emergencia' }} />
+        <Stack.Screen name="owner/search" options={{ headerShown: false, gestureEnabled: false }} />
+        <Stack.Screen name="owner/accepted" options={{ headerShown: false, gestureEnabled: false }} />
         <Stack.Screen name="vet/index" options={{ title: 'Modo veterinario' }} />
       </Stack>
     </SessionProvider>

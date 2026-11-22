@@ -1,0 +1,180 @@
+import { router } from 'expo-router';
+import { useState } from 'react';
+import { Linking, Platform, StyleSheet, Text, View } from 'react-native';
+
+import { PrimaryButton, SecondaryButton } from '@/components/Buttons';
+import { Card } from '@/components/Form';
+import { Screen } from '@/components/Screen';
+import { MessageScreen } from '@/components/StatusScreens';
+import { config } from '@/config';
+import { currentEmergency } from '@/features/emergency/currentEmergency';
+import { meetingPlace } from '@/features/emergency/types';
+import { formatARS } from '@/lib/format';
+import { Coords, formatKm } from '@/lib/geo';
+import { colors, font, radius, spacing } from '@/theme';
+
+function isNight(date = new Date()) {
+  const h = date.getHours();
+  return h >= config.nightStartHour || h < config.nightEndHour;
+}
+
+function openInMaps({ lat, lng }: Coords) {
+  const url =
+    Platform.OS === 'ios'
+      ? `https://maps.apple.com/?daddr=${lat},${lng}`
+      : `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+  Linking.openURL(url);
+}
+
+// A vet accepted: who, where to meet, what it costs, and one main "Llamar".
+export default function AcceptedScreen() {
+  const [emergency] = useState(currentEmergency.get);
+  const accepted = emergency?.accepted;
+
+  if (!emergency || !accepted) {
+    return (
+      <MessageScreen
+        title="No encontramos al veterinario"
+        message="Volvé a intentar desde el inicio."
+        actionLabel="Volver al inicio"
+        onAction={() => router.dismissTo('/owner')}
+      />
+    );
+  }
+
+  const { vet, distanceKm: km } = accepted;
+  const place = meetingPlace(vet, emergency.hasTransport);
+  const night = isNight();
+
+  const lines = [
+    { label: 'Consulta de urgencia', amount: vet.prices.base },
+    ...(place === 'home' && vet.prices.homeExtra > 0 ? [{ label: 'Atención a domicilio', amount: vet.prices.homeExtra }] : []),
+    ...(night && vet.prices.nightExtra > 0 ? [{ label: 'Recargo nocturno', amount: vet.prices.nightExtra }] : []),
+  ];
+  const total = lines.reduce((sum, l) => sum + l.amount, 0);
+
+  return (
+    <Screen
+      scroll
+      footer={
+        <>
+          <PrimaryButton
+            size="normal"
+            label={`📞 Llamar a ${vet.name}`}
+            onPress={() => Linking.openURL(`tel:${vet.phone.replace(/\D/g, '')}`)}
+          />
+          <SecondaryButton
+            label="Volver al inicio"
+            onPress={() => {
+              currentEmergency.clear();
+              router.dismissTo('/owner');
+            }}
+          />
+        </>
+      }
+    >
+      <View style={styles.header}>
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>✓ Aceptó tu urgencia</Text>
+        </View>
+        <Text style={styles.title}>{vet.name}</Text>
+        <Text style={styles.muted}>A {formatKm(km)} de vos · Tel. {vet.phone}</Text>
+      </View>
+
+      <Card>
+        <Text style={styles.cardLabel}>Dónde</Text>
+        {place === 'clinic' && vet.clinic ? (
+          <>
+            <Text style={styles.cardValue}>Llevá a tu mascota a su consultorio</Text>
+            <Text style={styles.body}>{vet.clinic.address}</Text>
+            <SecondaryButton label="Abrir en Mapas" onPress={() => openInMaps(vet.clinic!.coords)} />
+          </>
+        ) : (
+          <>
+            <Text style={styles.cardValue}>Va a ir a tu ubicación</Text>
+            <Text style={styles.body}>Esperalo donde estás. Si cambiaste de lugar, avisale cuando te llame.</Text>
+          </>
+        )}
+      </Card>
+
+      <Card>
+        <Text style={styles.cardLabel}>Precio de referencia</Text>
+        {lines.map((l) => (
+          <View key={l.label} style={styles.priceRow}>
+            <Text style={styles.body}>{l.label}</Text>
+            <Text style={styles.body}>{formatARS(l.amount)}</Text>
+          </View>
+        ))}
+        <View style={[styles.priceRow, styles.totalRow]}>
+          <Text style={styles.total}>Desde</Text>
+          <Text style={styles.total}>{formatARS(total)}</Text>
+        </View>
+        <Text style={styles.small}>El total puede variar según el diagnóstico, medicamentos o estudios.</Text>
+      </Card>
+    </Screen>
+  );
+}
+
+const styles = StyleSheet.create({
+  header: {
+    marginTop: spacing.md,
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  badge: {
+    backgroundColor: colors.successSoft,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  badgeText: {
+    color: colors.success,
+    fontWeight: '700',
+    fontSize: font.small,
+  },
+  title: {
+    fontSize: font.title,
+    fontWeight: '800',
+    color: colors.text,
+    textAlign: 'center',
+  },
+  muted: {
+    fontSize: font.body,
+    color: colors.textMuted,
+  },
+  cardLabel: {
+    fontSize: font.small,
+    fontWeight: '700',
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  cardValue: {
+    fontSize: font.subtitle,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  body: {
+    fontSize: font.body,
+    lineHeight: 22,
+    color: colors.text,
+  },
+  small: {
+    fontSize: font.small,
+    color: colors.textMuted,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  totalRow: {
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: spacing.sm,
+  },
+  total: {
+    fontSize: font.subtitle,
+    fontWeight: '800',
+    color: colors.text,
+  },
+});

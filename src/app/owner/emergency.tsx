@@ -1,56 +1,33 @@
 import { router } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
 
-import { SecondaryButton } from '@/components/Buttons';
-import { Screen } from '@/components/Screen';
-import { colors, font, radius, spacing } from '@/theme';
+import { LoadingScreen, MessageScreen } from '@/components/StatusScreens';
+import { isOwnerSetupComplete, loadOwnerData } from '@/features/owner/ownerData';
+import { errorMessage, useSession } from '@/lib/session';
 
-// Placeholder for the emergency flow (milestone 3: setup, confirm, search).
-export default function EmergencyPlaceholder() {
-  return (
-    <Screen>
-      <View style={styles.center}>
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>En construcción</Text>
-        </View>
-        <Text style={styles.title}>Acá vamos a buscar un veterinario de guardia</Text>
-        <Text style={styles.body}>
-          Próximos pasos: tu ubicación, si tenés cómo trasladar a tu mascota, y la búsqueda del
-          veterinario más cercano.
-        </Text>
-      </View>
+// Entry point of the emergency button: first time → setup, otherwise → confirm.
+export default function EmergencyEntry() {
+  const session = useSession();
+  const userId = session.status === 'ready' ? session.userId : null;
+  const [error, setError] = useState<string | null>(null);
 
-      <SecondaryButton label="Volver al inicio" onPress={() => router.back()} />
-    </Screen>
-  );
+  const route = useCallback(async () => {
+    if (!userId) return;
+    setError(null);
+    try {
+      const data = await loadOwnerData(userId);
+      router.replace(isOwnerSetupComplete(data) ? '/owner/confirm' : '/owner/setup');
+    } catch (e) {
+      setError(errorMessage(e));
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    route();
+  }, [route]);
+
+  if (error) {
+    return <MessageScreen title="No pudimos cargar tus datos" message={error} actionLabel="Reintentar" onAction={route} />;
+  }
+  return <LoadingScreen />;
 }
-
-const styles = StyleSheet.create({
-  center: {
-    flex: 1,
-    justifyContent: 'center',
-    gap: spacing.md,
-  },
-  badge: {
-    alignSelf: 'flex-start',
-    backgroundColor: colors.primarySoft,
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-  },
-  badgeText: {
-    color: colors.primary,
-    fontWeight: '700',
-    fontSize: font.small,
-  },
-  title: {
-    fontSize: font.title,
-    fontWeight: '800',
-    color: colors.text,
-  },
-  body: {
-    fontSize: font.body,
-    lineHeight: 24,
-    color: colors.textMuted,
-  },
-});

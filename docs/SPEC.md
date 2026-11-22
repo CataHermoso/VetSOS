@@ -98,9 +98,10 @@ Care, payment and vet availability are **three separate states**; the UI makes t
 
 ## 11. Build milestones
 
-1. **Setup** — Expo project, runs on iPhone via Expo Go, base theme (white/violet), navigation.
-2. **Supabase** — project, tables, anonymous login, owner/vet role pick.
-3. **Owner flow (mock data)** — every owner screen, with fake vets.
+1. ✅ **Setup** — Expo project, runs on iPhone via Expo Go, base theme (white/violet), navigation.
+2. ✅ **Supabase** — project, tables, anonymous login, owner/vet role pick.
+3. ✅ **Owner flow (mock data)** — setup, confirm, search (reject / no answer / try next / widen radius / clinics outside the network), cancel, accepted screen with prices. Fake vets in `src/features/emergency/mockVets.ts`; open settings in `src/config.ts`.
+   - Deferred: movable map pin and the small map on the accepted screen (need `react-native-maps`, which doesn't run on web; add with a native/web split). For now: GPS + optional address text + "Abrir en Mapas".
 4. **Vet flow (mock data)** — every vet screen.
 5. **Real matching** — realtime offers, accept/reject, timeout, lock.
 6. **Close & pay** — final amount, payment screen, "Pago realizado", back on call.
