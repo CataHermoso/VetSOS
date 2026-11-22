@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { ReactNode, useEffect, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { PrimaryButton, SecondaryButton } from '@/components/Buttons';
 import { Card } from '@/components/Form';
@@ -12,6 +12,7 @@ import { REJECT_REASON_TEXT, SearchState } from '@/features/emergency/types';
 import { useEmergencySearch } from '@/features/emergency/useEmergencySearch';
 import { formatSeconds } from '@/lib/format';
 import { formatKm } from '@/lib/geo';
+import { callPhone } from '@/lib/maps';
 import { colors, font, radius, spacing } from '@/theme';
 
 export default function SearchScreen() {
@@ -173,7 +174,7 @@ function KnownClinics() {
         <Pressable
           key={c.phone}
           accessibilityRole="button"
-          onPress={() => Linking.openURL(`tel:${c.phone.replace(/\D/g, '')}`)}
+          onPress={() => callPhone(c.phone)}
           style={({ pressed }) => [styles.clinic, pressed && styles.pressed]}
         >
           <View style={styles.flex}>

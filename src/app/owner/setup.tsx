@@ -18,6 +18,12 @@ type LocationState =
   | { status: 'denied' }
   | { status: 'unavailable' };
 
+async function detectPlace(): Promise<LocationState> {
+  const result = await getCurrentCoords();
+  if (!result.ok) return { status: result.reason };
+  return { status: 'found', coords: result.coords, area: await describeArea(result.coords) };
+}
+
 // First-time setup: the minimum we need to send a vet. Saved for next time.
 export default function OwnerSetup() {
   const session = useSession();
@@ -46,19 +52,22 @@ export default function OwnerSetup() {
       .finally(() => setLoaded(true));
   }, [userId]);
 
-  async function detectLocation() {
-    setLocation({ status: 'detecting' });
-    const result = await getCurrentCoords();
-    if (!result.ok) {
-      setLocation({ status: result.reason });
-      return;
-    }
-    setLocation({ status: 'found', coords: result.coords, area: await describeArea(result.coords) });
-  }
-
+  // Detect on open and on every "Volver a detectar" (which bumps detectAttempt).
+  const [detectAttempt, setDetectAttempt] = useState(0);
   useEffect(() => {
-    detectLocation();
-  }, []);
+    let cancelled = false;
+    detectPlace().then((l) => {
+      if (!cancelled) setLocation(l);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [detectAttempt]);
+
+  function detectLocation() {
+    setLocation({ status: 'detecting' });
+    setDetectAttempt((n) => n + 1);
+  }
 
   async function submit() {
     if (!userId) return;
@@ -119,7 +128,10 @@ export default function OwnerSetup() {
         <Card>
           <LocationStatus location={location} />
           {location.status !== 'detecting' ? (
-            <SecondaryButton label="Volver a detectar" onPress={detectLocation} />
+            <SecondaryButton
+              label="Volver a detectar"
+              onPress={detectLocation}
+            />
           ) : null}
         </Card>
       </Field>

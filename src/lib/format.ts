@@ -9,3 +9,8 @@ export function formatSeconds(total: number): string {
   const s = Math.max(0, Math.ceil(total));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
+
+/** Date → "03:45" (24 h). */
+export function formatTime(date: Date): string {
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}

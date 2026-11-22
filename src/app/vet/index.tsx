@@ -1,50 +1,67 @@
-import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { SecondaryButton } from '@/components/Buttons';
+import { PrimaryButton, SecondaryButton } from '@/components/Buttons';
+import { Card } from '@/components/Form';
 import { Screen } from '@/components/Screen';
+import { MessageScreen } from '@/components/StatusScreens';
+import { currentCase, snapshotOf } from '@/features/vet/currentCase';
+import { mockOfferFor } from '@/features/vet/mockOffer';
+import { VetState, clearSnooze, isVetProfileComplete, loadVet, setVetStatus } from '@/features/vet/vetData';
+import { formatTime } from '@/lib/format';
+import { getCurrentCoords } from '@/lib/location';
 import { errorMessage, useSession } from '@/lib/session';
-import { supabase } from '@/lib/supabase';
 import { colors, font, radius, spacing } from '@/theme';
 
-type VetStatus = 'offline' | 'available' | 'busy';
-
-// Vet home: one big availability switch, saved in the database.
-// (Location and receiving emergencies come in milestone 5.)
+// Vet home: one big availability switch.
 export default function VetHome() {
   const session = useSession();
   const userId = session.status === 'ready' ? session.userId : null;
 
-  const [status, setStatus] = useState<VetStatus | null>(null);
+  const [vet, setVet] = useState<VetState | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     if (!userId) return;
-    supabase
-      .from('vets')
-      .select('status')
-      .eq('profile_id', userId)
-      .maybeSingle()
-      .then(({ data, error: loadError }) => {
-        if (loadError) setError(loadError.message);
-        else setStatus((data?.status as VetStatus | undefined) ?? 'offline');
-      });
+    setLoadError(null);
+    try {
+      setVet(await loadVet(userId));
+    } catch (e) {
+      setLoadError(errorMessage(e));
+    }
   }, [userId]);
 
-  async function toggle() {
-    if (!userId || status === null || status === 'busy') return;
-    const next: VetStatus = status === 'available' ? 'offline' : 'available';
+  // Reload every time the screen shows: the profile or status may have changed elsewhere.
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load]),
+  );
+
+  if (loadError) return <MessageScreen title="No pudimos cargar tus datos" message={loadError} actionLabel="Reintentar" onAction={load} />;
+  if (!vet || !userId) {
+    return (
+      <Screen>
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      </Screen>
+    );
+  }
+
+  const complete = isVetProfileComplete(vet.profile);
+  const activeCase = currentCase.get();
+  const snoozed = vet.status === 'available' && vet.snoozedUntil && vet.snoozedUntil > new Date() ? vet.snoozedUntil : null;
+
+  async function change(work: () => Promise<void>) {
     setSaving(true);
     setError(null);
     try {
-      const { error: saveError } = await supabase
-        .from('vets')
-        .update({ status: next, last_seen_at: new Date().toISOString() })
-        .eq('profile_id', userId);
-      if (saveError) throw saveError;
-      setStatus(next);
+      await work();
+      await load();
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -52,44 +69,130 @@ export default function VetHome() {
     }
   }
 
-  const available = status === 'available';
+  function toggle() {
+    if (!vet || !userId) return;
+    if (vet.status === 'available') {
+      return change(() => setVetStatus(userId, 'offline', { snoozedUntil: null }));
+    }
+    // Going on call: save where the vet is, so distances are right.
+    return change(async () => {
+      const gps = await getCurrentCoords();
+      const coords = gps.ok ? gps.coords : vet.profile.clinicCoords;
+      if (!coords) throw new Error('Necesitamos tu ubicación para mandarte urgencias cercanas. Permití el acceso a la ubicación.');
+      await setVetStatus(userId, 'available', { coords, snoozedUntil: null });
+    });
+  }
 
+  function simulateOffer() {
+    if (!vet) return;
+    const coords = vet.lastCoords ?? vet.profile.clinicCoords;
+    if (!coords) return setError('Volvé a ponerte Disponible para que tomemos tu ubicación.');
+    currentCase.offer(mockOfferFor(vet.profile, coords), snapshotOf(vet.profile));
+    router.push('/vet/offer');
+  }
+
+  const footer = (
+    <>
+      <SecondaryButton label="Mi perfil" hint="Precios, cómo atendés, cobro" onPress={() => router.push('/vet/profile')} />
+      <SecondaryButton label="Cambiar de modo" onPress={() => router.push('/?pick=1')} />
+    </>
+  );
+
+  // 1. Profile first: without prices and bank details we can't send emergencies.
+  if (!complete) {
+    return (
+      <Screen footer={<SecondaryButton label="Cambiar de modo" onPress={() => router.push('/?pick=1')} />}>
+        <View style={styles.center}>
+          <Text style={styles.title}>Completá tu perfil</Text>
+          <Text style={styles.help}>
+            Antes de ponerte de guardia necesitamos saber cómo atendés, cuánto cobrás y dónde te transfieren.
+          </Text>
+          <PrimaryButton size="normal" label="Completar mi perfil" onPress={() => router.push('/vet/profile')} />
+        </View>
+      </Screen>
+    );
+  }
+
+  // 2. Busy with an emergency.
+  if (vet.status === 'busy') {
+    return (
+      <Screen footer={footer}>
+        <View style={styles.center}>
+          <View style={[styles.statusPill, styles.statusBusy]}>
+            <Text style={styles.statusBusyText}>Ocupado</Text>
+          </View>
+          {activeCase?.acceptedAt ? (
+            <>
+              <Text style={styles.title}>Tenés una urgencia en curso</Text>
+              <Text style={styles.help}>No te llegan otras urgencias hasta que la termines.</Text>
+              <PrimaryButton size="normal" label="Ver urgencia" onPress={() => router.push('/vet/case')} />
+            </>
+          ) : (
+            <>
+              <Text style={styles.help}>Figurás como ocupado, pero no encontramos una urgencia abierta en este teléfono.</Text>
+              <PrimaryButton
+                size="normal"
+                label={saving ? 'Guardando…' : 'Liberarme y volver a guardia'}
+                disabled={saving}
+                onPress={() => change(() => setVetStatus(userId, 'available'))}
+              />
+            </>
+          )}
+          {error ? <Text style={styles.error}>{error}</Text> : null}
+        </View>
+      </Screen>
+    );
+  }
+
+  // 3. The switch.
+  const available = vet.status === 'available';
   return (
-    <Screen>
+    <Screen footer={footer}>
       <View style={styles.center}>
         <Text style={styles.label}>Tu estado</Text>
 
-        {status === null && !error ? (
-          <ActivityIndicator size="large" color={colors.primary} />
-        ) : (
-          <Pressable
-            accessibilityRole="switch"
-            accessibilityState={{ checked: available, busy: saving }}
-            disabled={saving || status === null}
-            onPress={toggle}
-            style={({ pressed }) => [
-              styles.toggle,
-              available ? styles.toggleOn : styles.toggleOff,
-              (pressed || saving) && styles.pressed,
-            ]}
-          >
+        <Pressable
+          accessibilityRole="switch"
+          accessibilityState={{ checked: available, busy: saving }}
+          disabled={saving}
+          onPress={toggle}
+          style={({ pressed }) => [styles.toggle, available ? styles.toggleOn : styles.toggleOff, (pressed || saving) && styles.pressed]}
+        >
+          {saving ? (
+            <ActivityIndicator color={available ? colors.success : colors.textMuted} />
+          ) : (
             <View style={[styles.dot, available ? styles.dotOn : styles.dotOff]} />
-            <Text style={[styles.toggleText, available && styles.toggleTextOn]}>
-              {available ? 'Disponible' : 'No disponible'}
-            </Text>
-          </Pressable>
-        )}
+          )}
+          <Text style={[styles.toggleText, available && styles.toggleTextOn]}>{available ? 'Disponible' : 'No disponible'}</Text>
+        </Pressable>
 
         <Text style={styles.help}>
-          {available
-            ? 'Estás de guardia. Te van a llegar urgencias cercanas compatibles con tu forma de atender.'
-            : 'Tocá para ponerte de guardia. Podés pausarla cuando quieras.'}
+          {!available
+            ? 'Tocá para ponerte de guardia. Podés pausarla cuando quieras.'
+            : snoozed
+              ? 'Seguís de guardia, en pausa.'
+              : 'Estás de guardia. Te van a llegar urgencias cercanas compatibles con tu forma de atender.'}
         </Text>
+
+        {snoozed ? (
+          <Card>
+            <Text style={styles.body}>⏸ Pausado hasta las {formatTime(snoozed)}. No te llegan urgencias hasta entonces.</Text>
+            <SecondaryButton
+              label="Recibir urgencias ya"
+              onPress={() => change(() => clearSnooze(userId))}
+            />
+          </Card>
+        ) : null}
+
+        {__DEV__ && available && !snoozed ? (
+          <Card>
+            <Text style={styles.devLabel}>Simulación (solo en desarrollo)</Text>
+            <SecondaryButton label="Simular urgencia entrante" onPress={simulateOffer} />
+          </Card>
+        ) : null}
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
       </View>
-
-      <SecondaryButton label="Cambiar de modo" onPress={() => router.push('/?pick=1')} />
     </Screen>
   );
 }
@@ -99,6 +202,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     gap: spacing.lg,
+  },
+  title: {
+    fontSize: font.title,
+    fontWeight: '800',
+    color: colors.text,
+    textAlign: 'center',
   },
   label: {
     fontSize: font.subtitle,
@@ -145,11 +254,37 @@ const styles = StyleSheet.create({
   toggleTextOn: {
     color: colors.success,
   },
+  statusPill: {
+    alignSelf: 'center',
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  statusBusy: {
+    backgroundColor: colors.primarySoft,
+  },
+  statusBusyText: {
+    color: colors.primary,
+    fontWeight: '800',
+    fontSize: font.subtitle,
+  },
   help: {
     fontSize: font.body,
     lineHeight: 24,
     color: colors.textMuted,
     textAlign: 'center',
+  },
+  body: {
+    fontSize: font.body,
+    lineHeight: 22,
+    color: colors.text,
+  },
+  devLabel: {
+    fontSize: font.small,
+    fontWeight: '700',
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   error: {
     color: colors.warning,

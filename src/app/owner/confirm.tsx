@@ -17,6 +17,19 @@ import { colors, font, spacing } from '@/theme';
 
 type Place = { coords: Coords; area: string | null; source: 'gps' | 'saved' };
 
+/** Saved transport answer + where the owner is now (GPS, or the saved location as fallback). */
+async function findPlace(userId: string): Promise<{ hasTransport: boolean | null; place: Place }> {
+  const saved = await loadOwnerData(userId);
+  const gps = await getCurrentCoords();
+  if (gps.ok) {
+    return { hasTransport: saved.hasTransport, place: { coords: gps.coords, area: await describeArea(gps.coords), source: 'gps' } };
+  }
+  if (saved.coords) {
+    return { hasTransport: saved.hasTransport, place: { coords: saved.coords, area: saved.address || null, source: 'saved' } };
+  }
+  throw new Error('No pudimos saber dónde estás. Permití el acceso a la ubicación.');
+}
+
 // "Estás en X · Transporte: Sí" + one big button.
 // Location is re-detected every time: you're not always at home.
 export default function ConfirmEmergency() {
@@ -29,30 +42,30 @@ export default function ConfirmEmergency() {
   const [error, setError] = useState<string | null>(null);
   const started = useRef(false);
 
-  const load = useCallback(async () => {
-    if (!userId) return;
-    setError(null);
-    setPlace(null);
-    try {
-      const saved = await loadOwnerData(userId);
-      setHasTransport(saved.hasTransport);
-
-      const gps = await getCurrentCoords();
-      if (gps.ok) {
-        setPlace({ coords: gps.coords, area: await describeArea(gps.coords), source: 'gps' });
-      } else if (saved.coords) {
-        setPlace({ coords: saved.coords, area: saved.address || null, source: 'saved' });
-      } else {
-        throw new Error('No pudimos saber dónde estás. Permití el acceso a la ubicación.');
-      }
-    } catch (e) {
-      setError(errorMessage(e));
-    }
-  }, [userId]);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    if (!userId) return;
+    let cancelled = false;
+    findPlace(userId)
+      .then((r) => {
+        if (cancelled) return;
+        setHasTransport(r.hasTransport);
+        setPlace(r.place);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(errorMessage(e));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, attempt]);
+
+  function retry() {
+    setError(null);
+    setPlace(null);
+    setAttempt((n) => n + 1);
+  }
 
   const start = useCallback(() => {
     if (!place || hasTransport === null || started.current) return;
@@ -72,7 +85,7 @@ export default function ConfirmEmergency() {
   }
 
   if (error) {
-    return <MessageScreen title="Falta tu ubicación" message={error} actionLabel="Reintentar" onAction={load} />;
+    return <MessageScreen title="Falta tu ubicación" message={error} actionLabel="Reintentar" onAction={retry} />;
   }
   if (!config.showConfirmScreen) return <LoadingScreen />;
 

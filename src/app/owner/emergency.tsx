@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { LoadingScreen, MessageScreen } from '@/components/StatusScreens';
 import { isOwnerSetupComplete, loadOwnerData } from '@/features/owner/ownerData';
@@ -10,24 +10,35 @@ export default function EmergencyEntry() {
   const session = useSession();
   const userId = session.status === 'ready' ? session.userId : null;
   const [error, setError] = useState<string | null>(null);
-
-  const route = useCallback(async () => {
-    if (!userId) return;
-    setError(null);
-    try {
-      const data = await loadOwnerData(userId);
-      router.replace(isOwnerSetupComplete(data) ? '/owner/confirm' : '/owner/setup');
-    } catch (e) {
-      setError(errorMessage(e));
-    }
-  }, [userId]);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    route();
-  }, [route]);
+    if (!userId) return;
+    let cancelled = false;
+    loadOwnerData(userId)
+      .then((data) => {
+        if (!cancelled) router.replace(isOwnerSetupComplete(data) ? '/owner/confirm' : '/owner/setup');
+      })
+      .catch((e) => {
+        if (!cancelled) setError(errorMessage(e));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, attempt]);
 
   if (error) {
-    return <MessageScreen title="No pudimos cargar tus datos" message={error} actionLabel="Reintentar" onAction={route} />;
+    return (
+      <MessageScreen
+        title="No pudimos cargar tus datos"
+        message={error}
+        actionLabel="Reintentar"
+        onAction={() => {
+          setError(null);
+          setAttempt((n) => n + 1);
+        }}
+      />
+    );
   }
   return <LoadingScreen />;
 }

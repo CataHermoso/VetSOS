@@ -21,8 +21,6 @@ export function useEmergencySearch(request: SearchRequest, scenario: MockScenari
 
   const vets = useMemo(() => mockVetsAround({ lat, lng }), [lat, lng]);
   const [state, setState] = useState<SearchState | null>(null);
-  const stateRef = useRef(state);
-  stateRef.current = state;
 
   const contacted = useRef(new Set<string>());
   const radiusIndex = useRef(0);
@@ -117,9 +115,8 @@ export function useEmergencySearch(request: SearchRequest, scenario: MockScenari
   }, [contactNext, stopTimers]);
 
   const tryNext = useCallback(() => {
-    const s = stateRef.current;
-    contactNext(s?.phase === 'rejected' ? { vet: s.vet, reason: s.reason } : undefined);
-  }, [contactNext]);
+    contactNext(state?.phase === 'rejected' ? { vet: state.vet, reason: state.reason } : undefined);
+  }, [contactNext, state]);
 
   const expandRadius = useCallback(() => {
     if (radiusIndex.current < config.radiusStepsKm.length - 1) {

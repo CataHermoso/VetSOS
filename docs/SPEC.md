@@ -102,7 +102,9 @@ Care, payment and vet availability are **three separate states**; the UI makes t
 2. ✅ **Supabase** — project, tables, anonymous login, owner/vet role pick.
 3. ✅ **Owner flow (mock data)** — setup, confirm, search (reject / no answer / try next / widen radius / clinics outside the network), cancel, accepted screen with prices. Fake vets in `src/features/emergency/mockVets.ts`; open settings in `src/config.ts`.
    - Deferred: movable map pin and the small map on the accepted screen (need `react-native-maps`, which doesn't run on web; add with a native/web split). For now: GPS + optional address text + "Abrir en Mapas".
-4. **Vet flow (mock data)** — every vet screen.
+4. ✅ **Vet flow (mock data)** — profile (how they work, prices, bank details; required before going on call), availability switch (saves location), incoming emergency with countdown + vibration, Aceptar / Rechazar with reasons (30-min pause, unavailable today, too far), timeout, accepted case (Llamar, Abrir en Mapas, reference price), finish (final amount → paid / pending → back on call or end shift). Fake incoming emergencies in `src/features/vet/mockOffer.ts`, triggered by a dev-only "Simular urgencia entrante" button.
+   - Profile, status, location and the 30-min pause are saved in Supabase for real. The emergency itself lives in memory until milestone 5; the owner doesn't see the final amount or bank details until milestone 6.
+   - Deferred: alert sound (needs an audio file and a library; vibration only for now; real alerts come with push notifications).
 5. **Real matching** — realtime offers, accept/reject, timeout, lock.
 6. **Close & pay** — final amount, payment screen, "Pago realizado", back on call.
 7. **Polish & test** — two phones running a full emergency end-to-end.

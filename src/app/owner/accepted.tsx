@@ -1,30 +1,18 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Linking, Platform, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { PrimaryButton, SecondaryButton } from '@/components/Buttons';
 import { Card } from '@/components/Form';
+import { PriceCard } from '@/components/PriceCard';
 import { Screen } from '@/components/Screen';
 import { MessageScreen } from '@/components/StatusScreens';
-import { config } from '@/config';
 import { currentEmergency } from '@/features/emergency/currentEmergency';
+import { priceLines } from '@/features/emergency/prices';
 import { meetingPlace } from '@/features/emergency/types';
-import { formatARS } from '@/lib/format';
-import { Coords, formatKm } from '@/lib/geo';
+import { formatKm } from '@/lib/geo';
+import { callPhone, openInMaps } from '@/lib/maps';
 import { colors, font, radius, spacing } from '@/theme';
-
-function isNight(date = new Date()) {
-  const h = date.getHours();
-  return h >= config.nightStartHour || h < config.nightEndHour;
-}
-
-function openInMaps({ lat, lng }: Coords) {
-  const url =
-    Platform.OS === 'ios'
-      ? `https://maps.apple.com/?daddr=${lat},${lng}`
-      : `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
-  Linking.openURL(url);
-}
 
 // A vet accepted: who, where to meet, what it costs, and one main "Llamar".
 export default function AcceptedScreen() {
@@ -44,25 +32,14 @@ export default function AcceptedScreen() {
 
   const { vet, distanceKm: km } = accepted;
   const place = meetingPlace(vet, emergency.hasTransport);
-  const night = isNight();
-
-  const lines = [
-    { label: 'Consulta de urgencia', amount: vet.prices.base },
-    ...(place === 'home' && vet.prices.homeExtra > 0 ? [{ label: 'Atención a domicilio', amount: vet.prices.homeExtra }] : []),
-    ...(night && vet.prices.nightExtra > 0 ? [{ label: 'Recargo nocturno', amount: vet.prices.nightExtra }] : []),
-  ];
-  const total = lines.reduce((sum, l) => sum + l.amount, 0);
+  const { lines, total } = priceLines(vet.prices, place);
 
   return (
     <Screen
       scroll
       footer={
         <>
-          <PrimaryButton
-            size="normal"
-            label={`📞 Llamar a ${vet.name}`}
-            onPress={() => Linking.openURL(`tel:${vet.phone.replace(/\D/g, '')}`)}
-          />
+          <PrimaryButton size="normal" label={`📞 Llamar a ${vet.name}`} onPress={() => callPhone(vet.phone)} />
           <SecondaryButton
             label="Volver al inicio"
             onPress={() => {
@@ -97,20 +74,7 @@ export default function AcceptedScreen() {
         )}
       </Card>
 
-      <Card>
-        <Text style={styles.cardLabel}>Precio de referencia</Text>
-        {lines.map((l) => (
-          <View key={l.label} style={styles.priceRow}>
-            <Text style={styles.body}>{l.label}</Text>
-            <Text style={styles.body}>{formatARS(l.amount)}</Text>
-          </View>
-        ))}
-        <View style={[styles.priceRow, styles.totalRow]}>
-          <Text style={styles.total}>Desde</Text>
-          <Text style={styles.total}>{formatARS(total)}</Text>
-        </View>
-        <Text style={styles.small}>El total puede variar según el diagnóstico, medicamentos o estudios.</Text>
-      </Card>
+      <PriceCard lines={lines} total={total} note="El total puede variar según el diagnóstico, medicamentos o estudios." />
     </Screen>
   );
 }
@@ -157,24 +121,6 @@ const styles = StyleSheet.create({
   body: {
     fontSize: font.body,
     lineHeight: 22,
-    color: colors.text,
-  },
-  small: {
-    fontSize: font.small,
-    color: colors.textMuted,
-  },
-  priceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  totalRow: {
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    paddingTop: spacing.sm,
-  },
-  total: {
-    fontSize: font.subtitle,
-    fontWeight: '800',
     color: colors.text,
   },
 });

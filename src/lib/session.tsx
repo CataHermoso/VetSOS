@@ -23,14 +23,13 @@ const SessionContext = createContext<SessionContextValue | null>(null);
  * during an emergency) and loads their saved role.
  */
 export function SessionProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<SessionState>({ status: 'loading' });
+  const [state, setState] = useState<SessionState>(() =>
+    isSupabaseConfigured ? { status: 'loading' } : { status: 'unconfigured' },
+  );
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    if (!isSupabaseConfigured) {
-      setState({ status: 'unconfigured' });
-      return;
-    }
+    if (!isSupabaseConfigured) return;
 
     let cancelled = false;
 
