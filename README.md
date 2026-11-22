@@ -5,6 +5,14 @@ App that connects pet owners in an emergency with vets who volunteer to be on ca
 - Spec and roadmap: [docs/SPEC.md](docs/SPEC.md)
 - Stack: React Native + Expo (TypeScript), Expo Router. Supabase comes in milestone 2.
 
+## Supabase setup (once)
+
+1. In [supabase.com](https://supabase.com) → **New project** (region: São Paulo is the closest to Argentina). Save the database password somewhere safe.
+2. **Authentication → Sign In / Providers** → turn on **Allow anonymous sign-ins** → Save.
+3. **SQL Editor → New query** → paste all of [supabase/migrations/20261122000000_profiles_and_vets.sql](supabase/migrations/20261122000000_profiles_and_vets.sql) → **Run**.
+4. Click **Connect** (top of the project) → **Framework** → pick **Expo React Native** in the Framework dropdown (or any framework: the URL and key are the same, only the variable prefix changes) → copy the URL and the publishable key into `.env.local` (copy `.env.example` if it doesn't exist). `.env.local` is never committed.
+5. Restart `npx expo start`.
+
 ## Run it on your iPhone
 
 1. Install **Expo Go** from the App Store.

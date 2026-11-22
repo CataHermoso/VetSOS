@@ -1,12 +1,59 @@
-import { router } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Redirect, router, useLocalSearchParams } from 'expo-router';
+import { useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Screen } from '@/components/Screen';
+import { LoadingScreen, MessageScreen } from '@/components/StatusScreens';
+import { errorMessage, Role, useSession } from '@/lib/session';
 import { colors, font, radius, spacing } from '@/theme';
 
-// Temporary entry screen: pick a role. Once logins exist (milestone 2),
-// the app will remember the role and skip this screen.
+const HOME: Record<Role, '/owner' | '/vet'> = { owner: '/owner', vet: '/vet' };
+
+// Entry screen. If the role is already saved, go straight to that home.
+// `/?pick=1` forces the picker (used by "Cambiar de modo").
 export default function RolePicker() {
+  const session = useSession();
+  const { pick } = useLocalSearchParams<{ pick?: string }>();
+  const [saving, setSaving] = useState<Role | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  if (session.status === 'loading') return <LoadingScreen />;
+
+  if (session.status === 'unconfigured') {
+    return (
+      <MessageScreen
+        title="Falta configurar Supabase"
+        message="Completá EXPO_PUBLIC_SUPABASE_URL y EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY en el archivo .env.local y reiniciá `npx expo start`."
+      />
+    );
+  }
+
+  if (session.status === 'error') {
+    return (
+      <MessageScreen
+        title="No pudimos conectarnos"
+        message={session.message}
+        actionLabel="Reintentar"
+        onAction={session.retry}
+      />
+    );
+  }
+
+  if (session.role && !pick) return <Redirect href={HOME[session.role]} />;
+
+  async function choose(role: Role) {
+    setSaving(role);
+    setError(null);
+    try {
+      await session.setRole(role);
+      router.replace(HOME[role]);
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setSaving(null);
+    }
+  }
+
   return (
     <Screen>
       <View style={styles.header}>
@@ -18,14 +65,20 @@ export default function RolePicker() {
         <RoleCard
           title="Tengo una mascota"
           description="Pedí ayuda veterinaria urgente."
-          onPress={() => router.push('/owner')}
+          loading={saving === 'owner'}
+          disabled={saving !== null}
+          onPress={() => choose('owner')}
         />
         <RoleCard
           title="Soy veterinario/a"
           description="Ponete de guardia y recibí urgencias cerca tuyo."
-          onPress={() => router.push('/vet')}
+          loading={saving === 'vet'}
+          disabled={saving !== null}
+          onPress={() => choose('vet')}
         />
       </View>
+
+      {error ? <Text style={styles.error}>{error}</Text> : null}
     </Screen>
   );
 }
@@ -33,19 +86,28 @@ export default function RolePicker() {
 function RoleCard({
   title,
   description,
+  loading,
+  disabled,
   onPress,
 }: {
   title: string;
   description: string;
+  loading: boolean;
+  disabled: boolean;
   onPress: () => void;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityState={{ disabled, busy: loading }}
+      disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
     >
-      <Text style={styles.cardTitle}>{title}</Text>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardTitle}>{title}</Text>
+        {loading ? <ActivityIndicator color={colors.primary} /> : null}
+      </View>
       <Text style={styles.cardDescription}>{description}</Text>
     </Pressable>
   );
@@ -77,6 +139,11 @@ const styles = StyleSheet.create({
   cardPressed: {
     opacity: 0.8,
   },
+  cardRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   cardTitle: {
     fontSize: 20,
     fontWeight: '700',
@@ -86,5 +153,10 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
     fontSize: font.body,
     color: colors.textMuted,
+  },
+  error: {
+    marginTop: spacing.lg,
+    color: colors.warning,
+    fontSize: font.small,
   },
 });

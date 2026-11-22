@@ -1,11 +1,12 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
+import { SessionProvider } from '@/lib/session';
 import { colors } from '@/theme';
 
 export default function RootLayout() {
   return (
-    <>
+    <SessionProvider>
       <StatusBar style="dark" />
       <Stack
         screenOptions={{
@@ -22,6 +23,6 @@ export default function RootLayout() {
         <Stack.Screen name="owner/emergency" options={{ title: 'Emergencia' }} />
         <Stack.Screen name="vet/index" options={{ title: 'Modo veterinario' }} />
       </Stack>
-    </>
+    </SessionProvider>
   );
 }
