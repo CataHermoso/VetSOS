@@ -130,7 +130,7 @@ function Payment({ emergencyId, appointmentId }: { emergencyId?: string; appoint
 
       {paid ? (
         <Card>
-          <Text style={styles.body}>{details.vetName} confirmó que recibió la transferencia. ¡Gracias, y que tu mascota se mejore!</Text>
+          <Text style={styles.body}>{details.vetName} confirmó que recibió la transferencia. ¡Gracias!</Text>
         </Card>
       ) : (
         <>
