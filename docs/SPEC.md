@@ -112,5 +112,8 @@ Care, payment and vet availability are **three separate states**; the UI makes t
    - The vet already saves the final amount and payment status on the server; the owner's payment screen comes in milestone 6.
    - Simulated vets stay available in development ("Falsos" on the confirm screen, "Simular urgencia entrante" for vets).
 6. ✅ **Close & pay** — the vet enters the final amount → the owner's screen switches live to the payment screen (amount, alias / CBU / CVU, holder, bank, **Copiar alias**) → "Pago realizado" shows "✓ Pago confirmado" to the owner. The vet can close with payment pending and mark it later ("Pagos pendientes" on the vet home). The owner's home shows an emergency that still needs them (vet on the way, or payment pending in the last 24 h) so closing the app loses nothing. Server function in `supabase/migrations/20261124000000_payment_details.sql`.
-7. **Polish & test** — two phones running a full emergency end-to-end.
+7. **Polish & test** — two phones running a full emergency end-to-end. *(In progress.)*
+   - Done: the vet's screen stays on while on call (`expo-keep-awake`), since a locked phone stops receiving emergencies; the owner's phone buzzes when a vet accepts and when the payment screen appears; owner "Perfil" edits their data; the vet's "Pausado" notice clears itself when the 30 min end; form errors show above the save button.
+   - Next: whatever comes up testing on the iPhone + computer.
+   - Open question: what happens if the vet accepts but can't go, or the owner no longer needs help after acceptance? Right now neither side can undo an accepted emergency.
 8. **Web build** — same app running in the browser for the July demo (QR → open link).

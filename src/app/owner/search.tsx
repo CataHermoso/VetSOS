@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { ReactNode, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, Vibration, View } from 'react-native';
 
 import { PrimaryButton, SecondaryButton } from '@/components/Buttons';
 import { Card } from '@/components/Form';
@@ -58,6 +58,7 @@ function SearchView({ controls }: { controls: SearchControls }) {
   // A vet accepted → go to the "help is on the way" screen.
   useEffect(() => {
     if (state?.phase === 'accepted') {
+      Vibration.vibrate(400); // a buzz so the owner notices even if they looked away
       currentEmergency.setAccepted(state.vet, state.distanceKm, state.place);
       router.replace('/owner/accepted');
     }

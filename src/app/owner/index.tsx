@@ -83,7 +83,7 @@ export default function OwnerHome() {
 
       <View style={styles.secondary}>
         <SecondaryButton label="Sacar turno" hint="Próximamente" disabled />
-        <SecondaryButton label="Perfil" hint="Próximamente" disabled />
+        <SecondaryButton label="Perfil" hint="Tus datos" onPress={() => router.push('/owner/setup?from=profile')} />
         <SecondaryButton label="Cambiar de modo" onPress={() => router.push('/?pick=1')} />
       </View>
     </Screen>

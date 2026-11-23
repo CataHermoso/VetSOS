@@ -1,9 +1,10 @@
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { PrimaryButton, SecondaryButton } from '@/components/Buttons';
 import { Card } from '@/components/Form';
+import { KeepScreenOn } from '@/components/KeepScreenOn';
 import { Screen } from '@/components/Screen';
 import { MessageScreen } from '@/components/StatusScreens';
 import { getVetCase, offerFromRow } from '@/features/vet/api';
@@ -51,6 +52,15 @@ export default function VetHome() {
       load();
     }, [load]),
   );
+
+  // When the 30-minute pause ends, refresh so the screen stops saying "Pausado".
+  const snoozeEnd = vet?.snoozedUntil?.getTime() ?? 0;
+  useEffect(() => {
+    const ms = snoozeEnd - Date.now();
+    if (ms <= 0) return;
+    const t = setTimeout(() => load(), ms + 1000);
+    return () => clearTimeout(t);
+  }, [snoozeEnd, load]);
 
   // On call with a complete profile: listen for real emergencies.
   const onCall = vet !== null && vet.status === 'available' && isVetProfileComplete(vet.profile);
@@ -167,6 +177,7 @@ export default function VetHome() {
   const available = vet.status === 'available';
   return (
     <Screen footer={footer}>
+      {available ? <KeepScreenOn tag="vet-on-call" /> : null}
       <View style={styles.center}>
         <Text style={styles.label}>Tu estado</Text>
 
@@ -192,6 +203,9 @@ export default function VetHome() {
               ? 'Seguís de guardia, en pausa.'
               : 'Estás de guardia. Te van a llegar urgencias cercanas compatibles con tu forma de atender.'}
         </Text>
+        {available ? (
+          <Text style={styles.note}>Dejá la app abierta: la pantalla queda encendida para que te lleguen las urgencias.</Text>
+        ) : null}
 
         {snoozed ? (
           <Card>
@@ -292,6 +306,11 @@ const styles = StyleSheet.create({
   help: {
     fontSize: font.body,
     lineHeight: 24,
+    color: colors.textMuted,
+    textAlign: 'center',
+  },
+  note: {
+    fontSize: font.small,
     color: colors.textMuted,
     textAlign: 'center',
   },

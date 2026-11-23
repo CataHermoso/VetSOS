@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, Vibration, View } from 'react-native';
 
 import { PrimaryButton, SecondaryButton } from '@/components/Buttons';
 import { Card } from '@/components/Form';
@@ -23,7 +23,9 @@ export default function AcceptedScreen() {
   const live = useEmergencyStatus(emergency?.emergencyId);
   const finished = live?.status === 'finished';
   useEffect(() => {
-    if (finished) router.replace('/owner/payment');
+    if (!finished) return;
+    Vibration.vibrate(400);
+    router.replace('/owner/payment');
   }, [finished]);
 
   if (!emergency || !accepted) {

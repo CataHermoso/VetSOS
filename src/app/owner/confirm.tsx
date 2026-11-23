@@ -118,7 +118,7 @@ export default function ConfirmEmergency() {
             onPress={start}
             disabled={!place || hasTransport === null || starting}
           />
-          <SecondaryButton label="Editar mis datos" onPress={() => router.push('/owner/setup')} />
+          <SecondaryButton label="Editar mis datos" onPress={() => router.replace('/owner/setup')} />
         </>
       }
     >

@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
 
@@ -24,10 +24,14 @@ async function detectPlace(): Promise<LocationState> {
   return { status: 'found', coords: result.coords, area: await describeArea(result.coords) };
 }
 
-// First-time setup: the minimum we need to send a vet. Saved for next time.
+// The owner's data: the minimum we need to send a vet. Saved for next time.
+// ?from=profile → opened from "Perfil" on the home: saving goes back there.
+// Otherwise (first time, or "Editar mis datos" during an emergency): saving continues to the confirm screen.
 export default function OwnerSetup() {
   const session = useSession();
   const userId = session.status === 'ready' ? session.userId : null;
+  const { from } = useLocalSearchParams<{ from?: string }>();
+  const fromProfile = from === 'profile';
 
   const [loaded, setLoaded] = useState(false);
   const [fullName, setFullName] = useState('');
@@ -89,7 +93,8 @@ export default function OwnerSetup() {
         );
       }
       await saveOwnerData(userId, { fullName, phone, address, coords, hasTransport });
-      router.replace('/owner/confirm');
+      if (fromProfile && router.canGoBack()) router.back();
+      else router.replace('/owner/confirm');
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -102,11 +107,24 @@ export default function OwnerSetup() {
   return (
     <Screen
       scroll
-      footer={<PrimaryButton size="normal" label={saving ? 'Guardando…' : 'Guardar y continuar'} onPress={submit} disabled={saving} />}
+      footer={
+        <>
+          {/* Above the button: the form is long and an error at the bottom would be missed. */}
+          {error ? <Text style={styles.error}>{error}</Text> : null}
+          <PrimaryButton
+            size="normal"
+            label={saving ? 'Guardando…' : fromProfile ? 'Guardar' : 'Guardar y continuar'}
+            onPress={submit}
+            disabled={saving}
+          />
+        </>
+      }
     >
       <View style={styles.header}>
-        <Text style={styles.title}>Antes de buscar ayuda</Text>
-        <Text style={styles.subtitle}>Lo pedimos una sola vez. La próxima, es un solo toque.</Text>
+        {fromProfile ? null : <Text style={styles.title}>Antes de buscar ayuda</Text>}
+        <Text style={styles.subtitle}>
+          {fromProfile ? 'Los usamos cuando pedís ayuda.' : 'Lo pedimos una sola vez. La próxima, es un solo toque.'}
+        </Text>
       </View>
 
       <Field label="Tu nombre">
@@ -151,7 +169,6 @@ export default function OwnerSetup() {
         />
       </Field>
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
     </Screen>
   );
 }
