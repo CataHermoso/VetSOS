@@ -1,6 +1,7 @@
-// FAKE incoming emergencies for milestone 4. Milestone 5 replaces this with
-// real offers from Supabase realtime. Phone numbers use 0000 so nobody real gets called.
+// FAKE incoming emergencies, for trying the vet screens alone (development only).
+// Real offers arrive through useIncomingOffers. Phone numbers use 0000 so nobody real gets called.
 
+import { config } from '@/config';
 import { Coords, offsetCoords } from '@/lib/geo';
 
 import { VetOffer } from './types';
@@ -32,12 +33,17 @@ export function mockOfferFor(profile: VetProfile, vetCoords: Coords): VetOffer {
   const km = Math.min(3.4 + n * 1.3, Math.max(1, profile.maxHomeKm * 0.8));
   return {
     id: `mock-offer-${n}`,
+    emergencyId: null,
     ownerFirstName: owner.firstName,
-    ownerPhone: owner.phone,
-    ownerCoords: offsetCoords(vetCoords, km, 60 + n * 70),
-    reference: owner.reference,
+    area: null,
     hasTransport,
     distanceKm: km,
     place: hasTransport && canReceive ? 'clinic' : 'home',
+    deadline: Date.now() + config.offerTimeoutSeconds * 1000,
+    mockDetails: {
+      ownerPhone: owner.phone,
+      ownerCoords: offsetCoords(vetCoords, km, 60 + n * 70),
+      reference: owner.reference,
+    },
   };
 }

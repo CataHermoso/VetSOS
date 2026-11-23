@@ -105,7 +105,12 @@ Care, payment and vet availability are **three separate states**; the UI makes t
 4. ✅ **Vet flow (mock data)** — profile (how they work, prices, bank details; required before going on call), availability switch (saves location), incoming emergency with countdown + vibration, Aceptar / Rechazar with reasons (30-min pause, unavailable today, too far), timeout, accepted case (Llamar, Abrir en Mapas, reference price), finish (final amount → paid / pending → back on call or end shift). Fake incoming emergencies in `src/features/vet/mockOffer.ts`, triggered by a dev-only "Simular urgencia entrante" button.
    - Profile, status, location and the 30-min pause are saved in Supabase for real. The emergency itself lives in memory until milestone 5; the owner doesn't see the final amount or bank details until milestone 6.
    - Deferred: alert sound (needs an audio file and a library; vibration only for now; real alerts come with push notifications).
-5. **Real matching** — realtime offers, accept/reject, timeout, lock.
+5. ✅ **Real matching** — `emergencies` + `emergency_offers` tables; all changes go through server functions (`supabase/migrations/20261123000000_emergencies_and_offers.sql`). Offers arrive live (Supabase Realtime) with polling as a safety net; 45 s answer window; reject reasons applied on the server; atomic accept (one vet per emergency, one emergency per vet); owner cancel reaches the vet; the vet's case is restored after closing the app.
+   - Vets only get offers while the app is open: a heartbeat every minute, and vets not seen for 3 minutes are skipped.
+   - The vet sees only first name, area, distance and transport before accepting; phone and exact location after.
+   - "Nobody left in this radius" keeps the emergency as `searching` (the owner can widen it), instead of a `no_vets` status.
+   - The vet already saves the final amount and payment status on the server; the owner's payment screen comes in milestone 6.
+   - Simulated vets stay available in development ("Falsos" on the confirm screen, "Simular urgencia entrante" for vets).
 6. **Close & pay** — final amount, payment screen, "Pago realizado", back on call.
 7. **Polish & test** — two phones running a full emergency end-to-end.
 8. **Web build** — same app running in the browser for the July demo (QR → open link).

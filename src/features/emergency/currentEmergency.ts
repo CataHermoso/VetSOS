@@ -1,17 +1,18 @@
-// The emergency in progress, kept in memory and passed between screens.
+// The emergency in progress on the owner's phone, passed between screens in memory.
 // Locations never go into the URL: on web they would show up in history and logs.
-// Milestone 5 replaces this with the emergency row in Supabase (only its id is passed).
+// For a real search the emergency also lives in Supabase (emergencyId).
 
 import { Coords } from '@/lib/geo';
 
-import { MockScenario } from './mockVets';
-import { VetCandidate } from './types';
+import { Place, SearchMode, VetCandidate } from './types';
 
 export type CurrentEmergency = {
   coords: Coords;
   hasTransport: boolean;
-  scenario: MockScenario;
-  accepted?: { vet: VetCandidate; distanceKm: number };
+  mode: SearchMode;
+  /** Row in the emergencies table (real searches only). */
+  emergencyId?: string;
+  accepted?: { vet: VetCandidate; distanceKm: number; place: Place };
 };
 
 let current: CurrentEmergency | null = null;
@@ -23,8 +24,8 @@ export const currentEmergency = {
   get(): CurrentEmergency | null {
     return current;
   },
-  setAccepted(vet: VetCandidate, distanceKm: number) {
-    if (current) current = { ...current, accepted: { vet, distanceKm } };
+  setAccepted(vet: VetCandidate, distanceKm: number, place: Place) {
+    if (current) current = { ...current, accepted: { vet, distanceKm, place } };
   },
   clear() {
     current = null;

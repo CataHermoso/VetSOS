@@ -3,19 +3,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { config } from '@/config';
 import { distanceKm } from '@/lib/geo';
 
-import { MockScenario, MOCK_OFFER_TIMEOUT_SECONDS, mockResponseFor, mockVetsAround } from './mockVets';
-import { RejectReason, SearchRequest, SearchState, VetCandidate } from './types';
+import { MockScenario, MockVet, MOCK_OFFER_TIMEOUT_SECONDS, mockResponseFor, mockVetsAround } from './mockVets';
+import { RejectReason, SearchControls, SearchRequest, SearchState, VetRef, meetingPlace } from './types';
 
 /**
- * Runs an emergency search: offers it to one vet at a time, nearest first.
+ * SIMULATED emergency search with fake vets (mockVets.ts), for development.
+ * Same rules as the real one (useLiveSearch.ts):
+ * - Offers it to one vet at a time, nearest first.
  * - A vet who rejects or doesn't answer is never offered the same emergency again.
  * - The owner decides when to try the next vet (not automatic).
  * - When nobody is left in the radius, the owner can widen it.
- *
- * MILESTONE 3: answers are simulated (mockVets.ts). Milestone 5 swaps the
- * inside of this hook for Supabase realtime; the screens stay the same.
  */
-export function useEmergencySearch(request: SearchRequest, scenario: MockScenario) {
+export function useMockSearch(request: SearchRequest, scenario: MockScenario): SearchControls {
   const { lat, lng } = request.coords;
   const { hasTransport } = request;
 
@@ -34,7 +33,7 @@ export function useEmergencySearch(request: SearchRequest, scenario: MockScenari
     ticker.current = null;
   }, []);
 
-  const distanceTo = useCallback((vet: VetCandidate) => distanceKm({ lat, lng }, vet.coords), [lat, lng]);
+  const distanceTo = useCallback((vet: MockVet) => distanceKm({ lat, lng }, vet.coords), [lat, lng]);
 
   const findNextVet = useCallback(
     (radiusKm: number) =>
@@ -52,7 +51,7 @@ export function useEmergencySearch(request: SearchRequest, scenario: MockScenari
   );
 
   const contactNext = useCallback(
-    (lastRejection?: { vet: VetCandidate; reason: RejectReason }) => {
+    (lastRejection?: { vet: VetRef; reason: RejectReason }) => {
       stopTimers();
       const steps = config.radiusStepsKm;
       const radiusKm = steps[radiusIndex.current];
@@ -96,14 +95,14 @@ export function useEmergencySearch(request: SearchRequest, scenario: MockScenari
         timers.current.push(
           setTimeout(() => {
             stopTimers();
-            setState({ phase: 'accepted', vet, distanceKm: km });
+            setState({ phase: 'accepted', vet, distanceKm: km, place: meetingPlace(vet, hasTransport) });
           }, response.afterMs),
         );
       } else if (response.kind === 'reject') {
         timers.current.push(setTimeout(() => finishRejected(response.reason), response.afterMs));
       }
     },
-    [findNextVet, scenario, stopTimers],
+    [findNextVet, scenario, stopTimers, hasTransport],
   );
 
   // Start searching as soon as the screen opens.
@@ -125,5 +124,7 @@ export function useEmergencySearch(request: SearchRequest, scenario: MockScenari
     }
   }, [contactNext]);
 
-  return { state, tryNext, expandRadius, stop: stopTimers };
+  const retry = useCallback(() => {}, []);
+
+  return { state, tryNext, expandRadius, stop: stopTimers, retry };
 }

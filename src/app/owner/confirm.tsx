@@ -8,7 +8,8 @@ import { Screen } from '@/components/Screen';
 import { LoadingScreen, MessageScreen } from '@/components/StatusScreens';
 import { config } from '@/config';
 import { currentEmergency } from '@/features/emergency/currentEmergency';
-import { MockScenario } from '@/features/emergency/mockVets';
+import { apiErrorMessage, createEmergency } from '@/features/emergency/api';
+import { SearchMode } from '@/features/emergency/types';
 import { loadOwnerData, saveTransport } from '@/features/owner/ownerData';
 import { Coords } from '@/lib/geo';
 import { describeArea, getCurrentCoords } from '@/lib/location';
@@ -38,7 +39,9 @@ export default function ConfirmEmergency() {
 
   const [place, setPlace] = useState<Place | null>(null);
   const [hasTransport, setHasTransport] = useState<boolean | null>(null);
-  const [scenario, setScenario] = useState<MockScenario>('normal');
+  const [mode, setMode] = useState<SearchMode>('live');
+  const [starting, setStarting] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const started = useRef(false);
 
@@ -67,15 +70,30 @@ export default function ConfirmEmergency() {
     setAttempt((n) => n + 1);
   }
 
-  const start = useCallback(() => {
+  const start = useCallback(async () => {
     if (!place || hasTransport === null || started.current) return;
     started.current = true;
-    currentEmergency.start({ coords: place.coords, hasTransport, scenario });
-    router.replace('/owner/search');
-  }, [place, hasTransport, scenario]);
+    setStarting(true);
+    setStartError(null);
+    try {
+      // Real search: open the emergency on the server first (only the area, never the
+      // saved address, is shown to vets before they accept).
+      const emergencyId =
+        mode === 'live'
+          ? await createEmergency(place.coords, hasTransport, place.source === 'gps' ? place.area : null)
+          : undefined;
+      currentEmergency.start({ coords: place.coords, hasTransport, mode, emergencyId });
+      router.replace('/owner/search');
+    } catch (e) {
+      started.current = false;
+      setStarting(false);
+      setStartError(apiErrorMessage(e));
+    }
+  }, [place, hasTransport, mode]);
 
   // If the confirm screen is turned off in config, go straight to searching.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- starting on its own is the point of this setting
     if (!config.showConfirmScreen && place && hasTransport !== null) start();
   }, [place, hasTransport, start]);
 
@@ -93,11 +111,12 @@ export default function ConfirmEmergency() {
     <Screen
       footer={
         <>
+          {startError ? <Text style={styles.error}>{startError}</Text> : null}
           <PrimaryButton
-            label="PEDIR AYUDA AHORA"
+            label={starting ? 'ENVIANDO…' : 'PEDIR AYUDA AHORA'}
             hint="Contactamos al veterinario más cercano"
             onPress={start}
-            disabled={!place || hasTransport === null}
+            disabled={!place || hasTransport === null || starting}
           />
           <SecondaryButton label="Editar mis datos" onPress={() => router.push('/owner/setup')} />
         </>
@@ -137,15 +156,21 @@ export default function ConfirmEmergency() {
 
         {__DEV__ ? (
           <Card>
-            <Text style={styles.cardLabel}>Simulación (solo en desarrollo)</Text>
+            <Text style={styles.cardLabel}>Veterinarios (solo en desarrollo)</Text>
             <Choice
               options={[
-                { value: 'normal', label: 'Alguien acepta' },
-                { value: 'nobody', label: 'Nadie atiende' },
+                { value: 'live', label: 'Reales' },
+                { value: 'mock_accept', label: 'Falsos: acepta' },
+                { value: 'mock_nobody', label: 'Falsos: nadie' },
               ]}
-              value={scenario}
-              onChange={setScenario}
+              value={mode}
+              onChange={setMode}
             />
+            <Text style={styles.note}>
+              {mode === 'live'
+                ? 'Busca veterinarios de verdad que estén Disponibles (por ejemplo, la app abierta en otro teléfono).'
+                : 'Usa veterinarios inventados, sin conexión con nadie.'}
+            </Text>
           </Card>
         ) : null}
       </View>
@@ -170,6 +195,11 @@ const styles = StyleSheet.create({
     fontSize: font.subtitle,
     fontWeight: '600',
     color: colors.text,
+  },
+  error: {
+    color: colors.warning,
+    fontSize: font.small,
+    textAlign: 'center',
   },
   note: {
     fontSize: font.small,

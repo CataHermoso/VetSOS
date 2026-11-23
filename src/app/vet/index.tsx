@@ -6,7 +6,9 @@ import { PrimaryButton, SecondaryButton } from '@/components/Buttons';
 import { Card } from '@/components/Form';
 import { Screen } from '@/components/Screen';
 import { MessageScreen } from '@/components/StatusScreens';
+import { getVetCase, offerFromRow } from '@/features/vet/api';
 import { currentCase, snapshotOf } from '@/features/vet/currentCase';
+import { useIncomingOffers } from '@/features/vet/useIncomingOffers';
 import { mockOfferFor } from '@/features/vet/mockOffer';
 import { VetState, clearSnooze, isVetProfileComplete, loadVet, setVetStatus } from '@/features/vet/vetData';
 import { formatTime } from '@/lib/format';
@@ -28,7 +30,15 @@ export default function VetHome() {
     if (!userId) return;
     setLoadError(null);
     try {
-      setVet(await loadVet(userId));
+      const loaded = await loadVet(userId);
+      // Busy but this phone doesn't know the case (app was closed): bring it back from the server.
+      if (loaded.status === 'busy' && !currentCase.get()?.acceptedAt) {
+        const saved = await getVetCase();
+        if (saved) {
+          currentCase.restore({ offer: saved.offer, vet: snapshotOf(loaded.profile), details: saved.details, acceptedAt: saved.acceptedAt });
+        }
+      }
+      setVet(loaded);
     } catch (e) {
       setLoadError(errorMessage(e));
     }
@@ -40,6 +50,14 @@ export default function VetHome() {
       load();
     }, [load]),
   );
+
+  // On call with a complete profile: listen for real emergencies.
+  const onCall = vet !== null && vet.status === 'available' && isVetProfileComplete(vet.profile);
+  useIncomingOffers(userId, onCall, (row) => {
+    if (!vet) return;
+    currentCase.offer(offerFromRow(row), snapshotOf(vet.profile));
+    router.push('/vet/offer');
+  });
 
   if (loadError) return <MessageScreen title="No pudimos cargar tus datos" message={loadError} actionLabel="Reintentar" onAction={load} />;
   if (!vet || !userId) {

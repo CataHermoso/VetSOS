@@ -1,17 +1,30 @@
+import { Place } from '@/features/emergency/types';
 import { Coords } from '@/lib/geo';
 
 /** An emergency offered to this vet: only what they need to decide. */
 export type VetOffer = {
   id: string;
+  /** The emergency on the server, or null for a simulated offer. */
+  emergencyId: string | null;
   ownerFirstName: string;
+  /** Neighbourhood, if the owner's phone could tell. */
+  area: string | null;
+  hasTransport: boolean;
+  distanceKm: number;
+  /** Where they'd meet: the vet's clinic or the owner's location. */
+  place: Place;
+  /** Local time (ms) when the answer window closes. */
+  deadline: number;
+  /** Simulated offers carry the details a real one only reveals after accepting. */
+  mockDetails?: CaseDetails;
+};
+
+/** What the vet gets only after accepting. */
+export type CaseDetails = {
   ownerPhone: string;
   ownerCoords: Coords;
   /** Address details / reference the owner typed (may be empty). */
   reference: string;
-  hasTransport: boolean;
-  distanceKm: number;
-  /** Where they'd meet: the vet's clinic or the owner's location. */
-  place: 'clinic' | 'home';
 };
 
 export type VetRejectReason = 'busy_30' | 'unavailable_today' | 'too_far';

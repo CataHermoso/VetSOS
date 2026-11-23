@@ -9,7 +9,6 @@ import { Screen } from '@/components/Screen';
 import { MessageScreen } from '@/components/StatusScreens';
 import { currentEmergency } from '@/features/emergency/currentEmergency';
 import { priceLines } from '@/features/emergency/prices';
-import { meetingPlace } from '@/features/emergency/types';
 import { formatKm } from '@/lib/geo';
 import { callPhone, openInMaps } from '@/lib/maps';
 import { colors, font, radius, spacing } from '@/theme';
@@ -30,8 +29,7 @@ export default function AcceptedScreen() {
     );
   }
 
-  const { vet, distanceKm: km } = accepted;
-  const place = meetingPlace(vet, emergency.hasTransport);
+  const { vet, distanceKm: km, place } = accepted;
   const { lines, total } = priceLines(vet.prices, place);
 
   return (

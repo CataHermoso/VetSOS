@@ -6,21 +6,23 @@ import { PrimaryButton, SecondaryButton } from '@/components/Buttons';
 import { Card } from '@/components/Form';
 import { Screen } from '@/components/Screen';
 import { MessageScreen } from '@/components/StatusScreens';
-import { config } from '@/config';
+import { apiErrorMessage, fetchOffer } from '@/features/emergency/api';
 import { priceLines } from '@/features/emergency/prices';
+import { RespondResult, getVetCase, respondOffer } from '@/features/vet/api';
 import { VetCase, currentCase } from '@/features/vet/currentCase';
 import { VET_REJECT_OPTIONS, VetRejectReason } from '@/features/vet/types';
 import { setVetStatus, snoozeVet } from '@/features/vet/vetData';
 import { formatARS, formatSeconds } from '@/lib/format';
 import { formatKm } from '@/lib/geo';
-import { describeArea } from '@/lib/location';
-import { errorMessage, useSession } from '@/lib/session';
+import { useSession } from '@/lib/session';
 import { colors, font, radius, spacing } from '@/theme';
 
 // Buzz, pause, buzz… until the vet answers or time runs out.
 const ALERT_PATTERN = [0, 700, 500];
+// How often we check whether the owner cancelled while the vet is deciding.
+const CANCEL_CHECK_MS = 3000;
 
-type Step = 'deciding' | 'reasons' | 'timeout';
+type Step = 'deciding' | 'reasons' | 'timeout' | 'gone' | 'busy';
 
 // Incoming emergency: everything needed to decide in a few seconds, then Aceptar / Rechazar.
 export default function IncomingOffer() {
@@ -43,20 +45,21 @@ function Offer({ vetCase }: { vetCase: VetCase }) {
   const session = useSession();
   const userId = session.status === 'ready' ? session.userId : null;
   const { offer, vet } = vetCase;
+  const live = offer.emergencyId !== null;
 
   const [step, setStep] = useState<Step>('deciding');
-  const [secondsLeft, setSecondsLeft] = useState<number>(config.offerTimeoutSeconds);
-  const [area, setArea] = useState<string | null>(null);
+  const [secondsLeft, setSecondsLeft] = useState(() => Math.max(0, (offer.deadline - Date.now()) / 1000));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [deadline] = useState(() => Date.now() + config.offerTimeoutSeconds * 1000);
+
+  const deciding = step === 'deciding' || step === 'reasons';
 
   // Alert + countdown while deciding. Leaving the screen always stops the buzzing.
   useEffect(() => {
-    if (step === 'timeout') return;
+    if (!deciding) return;
     Vibration.vibrate(ALERT_PATTERN, true);
     const tick = setInterval(() => {
-      const left = (deadline - Date.now()) / 1000;
+      const left = (offer.deadline - Date.now()) / 1000;
       setSecondsLeft(Math.max(0, left));
       if (left <= 0) setStep('timeout');
     }, 250);
@@ -64,22 +67,49 @@ function Offer({ vetCase }: { vetCase: VetCase }) {
       clearInterval(tick);
       Vibration.cancel();
     };
-  }, [step, deadline]);
+  }, [deciding, offer.deadline]);
 
+  // Real offers: notice if the owner cancels while the vet is deciding.
   useEffect(() => {
-    describeArea(offer.ownerCoords).then(setArea);
-  }, [offer.ownerCoords]);
+    if (!live || !deciding) return;
+    const check = setInterval(() => {
+      fetchOffer(offer.id)
+        .then((row) => {
+          if (row && row.response !== null && row.response !== 'accepted') setStep(row.response === 'timeout' ? 'timeout' : 'gone');
+        })
+        .catch(() => {});
+    }, CANCEL_CHECK_MS);
+    return () => clearInterval(check);
+  }, [live, deciding, offer.id]);
+
+  /** Shared handling of the server's answer to Aceptar / Rechazar. */
+  function handleResult(result: RespondResult) {
+    if (result === 'expired') setStep('timeout');
+    else if (result === 'gone') setStep('gone');
+    else if (result === 'busy') setStep('busy');
+  }
 
   async function accept() {
     if (!userId) return;
     setSaving(true);
     setError(null);
     try {
-      await setVetStatus(userId, 'busy');
-      currentCase.accept();
+      if (live) {
+        const result = await respondOffer(offer.id, true);
+        if (result !== 'accepted') {
+          setSaving(false);
+          return handleResult(result);
+        }
+        const saved = await getVetCase();
+        if (!saved) throw new Error('Aceptaste, pero no pudimos cargar los datos. Volvé al inicio.');
+        currentCase.accept(saved.details, saved.acceptedAt);
+      } else {
+        await setVetStatus(userId, 'busy');
+        currentCase.accept(offer.mockDetails!);
+      }
       router.replace('/vet/case');
     } catch (e) {
-      setError(errorMessage(e));
+      setError(apiErrorMessage(e));
       setSaving(false);
     }
   }
@@ -89,14 +119,28 @@ function Offer({ vetCase }: { vetCase: VetCase }) {
     setSaving(true);
     setError(null);
     try {
-      if (reason === 'busy_30') await snoozeVet(userId, 30);
-      if (reason === 'unavailable_today') await setVetStatus(userId, 'offline', { snoozedUntil: null });
+      if (live) {
+        // The server records the reason and applies the pause / "no disponible".
+        const result = await respondOffer(offer.id, false, reason);
+        if (result !== 'rejected') {
+          setSaving(false);
+          return handleResult(result);
+        }
+      } else {
+        if (reason === 'busy_30') await snoozeVet(userId, 30);
+        if (reason === 'unavailable_today') await setVetStatus(userId, 'offline', { snoozedUntil: null });
+      }
       currentCase.clear();
       router.dismissTo('/vet');
     } catch (e) {
-      setError(errorMessage(e));
+      setError(apiErrorMessage(e));
       setSaving(false);
     }
+  }
+
+  function leave() {
+    currentCase.clear();
+    router.dismissTo('/vet');
   }
 
   if (step === 'timeout') {
@@ -105,10 +149,27 @@ function Offer({ vetCase }: { vetCase: VetCase }) {
         title="No respondiste a tiempo"
         message="La urgencia pasó al siguiente veterinario. Seguís de guardia."
         actionLabel="Volver"
-        onAction={() => {
-          currentCase.clear();
-          router.dismissTo('/vet');
-        }}
+        onAction={leave}
+      />
+    );
+  }
+  if (step === 'gone') {
+    return (
+      <MessageScreen
+        title="La urgencia ya no está disponible"
+        message="El dueño canceló la búsqueda. Seguís de guardia."
+        actionLabel="Volver"
+        onAction={leave}
+      />
+    );
+  }
+  if (step === 'busy') {
+    return (
+      <MessageScreen
+        title="Ya tenés una urgencia en curso"
+        message="Terminala antes de aceptar otra."
+        actionLabel="Volver"
+        onAction={leave}
       />
     );
   }
@@ -162,11 +223,11 @@ function Offer({ vetCase }: { vetCase: VetCase }) {
 
       <Card>
         <Row label="Distancia" value={`A ${formatKm(offer.distanceKm)} de vos`} />
-        {area ? <Row label="Zona" value={area} /> : null}
-        <Row
-          label="Dónde"
-          value={offer.place === 'clinic' ? 'Lleva a su mascota a tu consultorio' : 'Vas vos: no tiene cómo trasladarla'}
-        />
+        {offer.area ? <Row label="Zona" value={offer.area} /> : null}
+        <Row label="Dónde" value={offer.place === 'clinic' ? 'Lleva a su mascota a tu consultorio' : 'Vas vos a su ubicación'} />
+        {offer.place === 'home' ? (
+          <Row label="Transporte" value={offer.hasTransport ? 'Tiene cómo trasladar a su mascota' : 'No tiene cómo trasladarla'} />
+        ) : null}
         <Row label="Cobrarías" value={`Desde ${formatARS(total)}`} />
       </Card>
     </Screen>

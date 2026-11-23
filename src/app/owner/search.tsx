@@ -8,8 +8,9 @@ import { Screen } from '@/components/Screen';
 import { MessageScreen } from '@/components/StatusScreens';
 import { currentEmergency } from '@/features/emergency/currentEmergency';
 import { MOCK_KNOWN_CLINICS, MockScenario } from '@/features/emergency/mockVets';
-import { REJECT_REASON_TEXT, SearchState } from '@/features/emergency/types';
-import { useEmergencySearch } from '@/features/emergency/useEmergencySearch';
+import { REJECT_REASON_TEXT, SearchControls, SearchState } from '@/features/emergency/types';
+import { useLiveSearch } from '@/features/emergency/useLiveSearch';
+import { useMockSearch } from '@/features/emergency/useMockSearch';
 import { formatSeconds } from '@/lib/format';
 import { formatKm } from '@/lib/geo';
 import { callPhone } from '@/lib/maps';
@@ -29,24 +30,35 @@ export default function SearchScreen() {
     );
   }
 
+  if (emergency.mode === 'live') {
+    return emergency.emergencyId ? <LiveSearch emergencyId={emergency.emergencyId} /> : null;
+  }
   return (
-    <Search
+    <MockSearch
       lat={emergency.coords.lat}
       lng={emergency.coords.lng}
       hasTransport={emergency.hasTransport}
-      scenario={emergency.scenario}
+      scenario={emergency.mode}
     />
   );
 }
 
-function Search({ lat, lng, hasTransport, scenario }: { lat: number; lng: number; hasTransport: boolean; scenario: MockScenario }) {
-  const { state, tryNext, expandRadius, stop } = useEmergencySearch({ coords: { lat, lng }, hasTransport }, scenario);
+function LiveSearch({ emergencyId }: { emergencyId: string }) {
+  return <SearchView controls={useLiveSearch(emergencyId)} />;
+}
+
+function MockSearch({ lat, lng, hasTransport, scenario }: { lat: number; lng: number; hasTransport: boolean; scenario: MockScenario }) {
+  return <SearchView controls={useMockSearch({ coords: { lat, lng }, hasTransport }, scenario)} />;
+}
+
+function SearchView({ controls }: { controls: SearchControls }) {
+  const { state, tryNext, expandRadius, stop, retry } = controls;
   const [confirmCancel, setConfirmCancel] = useState(false);
 
   // A vet accepted → go to the "help is on the way" screen.
   useEffect(() => {
     if (state?.phase === 'accepted') {
-      currentEmergency.setAccepted(state.vet, state.distanceKm);
+      currentEmergency.setAccepted(state.vet, state.distanceKm, state.place);
       router.replace('/owner/accepted');
     }
   }, [state]);
@@ -55,6 +67,24 @@ function Search({ lat, lng, hasTransport, scenario }: { lat: number; lng: number
     stop();
     currentEmergency.clear();
     router.dismissTo('/owner');
+  }
+
+  if (state?.phase === 'error') {
+    return (
+      <Screen
+        footer={
+          <>
+            <PrimaryButton size="normal" label="Reintentar" onPress={retry} />
+            <SecondaryButton label="Cancelar búsqueda" onPress={cancel} />
+          </>
+        }
+      >
+        <View style={styles.center}>
+          <Text style={styles.title}>No pudimos seguir buscando</Text>
+          <Text style={styles.muted}>{state.message}</Text>
+        </View>
+      </Screen>
+    );
   }
 
   const cancelArea = confirmCancel ? (
@@ -74,14 +104,14 @@ function Search({ lat, lng, hasTransport, scenario }: { lat: number; lng: number
   );
 
   return (
-    <Screen scroll footer={<Footer state={state} onTryNext={tryNext} onExpand={expandRadius} cancelArea={cancelArea} />}>
+    <Screen scroll footer={<Footer state={state} onTryNext={tryNext} onExpand={expandRadius} onLeave={cancel} cancelArea={cancelArea} />}>
       <PhaseBody state={state} />
     </Screen>
   );
 }
 
 function PhaseBody({ state }: { state: SearchState | null }) {
-  if (!state || state.phase === 'accepted') {
+  if (!state || state.phase === 'accepted' || state.phase === 'error') {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color={colors.primary} />
@@ -136,11 +166,13 @@ function Footer({
   state,
   onTryNext,
   onExpand,
+  onLeave,
   cancelArea,
 }: {
   state: SearchState | null;
   onTryNext: () => void;
   onExpand: () => void;
+  onLeave: () => void;
   cancelArea: ReactNode;
 }) {
   if (state?.phase === 'rejected') {
@@ -158,7 +190,7 @@ function Footer({
         {cancelArea}
       </>
     ) : (
-      <SecondaryButton label="Volver al inicio" onPress={() => router.dismissTo('/owner')} />
+      <SecondaryButton label="Volver al inicio" onPress={onLeave} />
     );
   }
   return <>{cancelArea}</>;

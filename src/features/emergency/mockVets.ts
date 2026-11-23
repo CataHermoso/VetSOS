@@ -6,7 +6,10 @@ import { Coords, offsetCoords } from '@/lib/geo';
 
 import { RejectReason, ServiceMode, VetCandidate } from './types';
 
-export type MockScenario = 'normal' | 'nobody';
+export type MockScenario = 'mock_accept' | 'mock_nobody';
+
+/** Fake vets also know where they are, to work out distances. */
+export type MockVet = VetCandidate & { coords: Coords };
 
 type MockResponse = { kind: 'accept'; afterMs: number } | { kind: 'reject'; reason: RejectReason; afterMs: number } | { kind: 'timeout' };
 
@@ -23,11 +26,11 @@ type MockVetSpec = {
 };
 
 /*
- * Scenario "normal":
+ * Scenario "mock_accept":
  *  - With transport:    Méndez rejects → Sosa doesn't answer → Ríos (clinic) accepts.
  *  - Without transport: Méndez rejects → Sosa doesn't answer → nobody left in 10 km
  *                       → "Ampliar búsqueda" → Luna (home visits, 18 km) accepts.
- * Scenario "nobody": everyone rejects → ends in the list of clinics outside the network.
+ * Scenario "mock_nobody": everyone rejects → ends in the list of clinics outside the network.
  */
 const SPECS: MockVetSpec[] = [
   {
@@ -88,7 +91,7 @@ const SPECS: MockVetSpec[] = [
 /** Mock vets answer faster than real ones so testing doesn't take forever. */
 export const MOCK_OFFER_TIMEOUT_SECONDS = 10;
 
-export function mockVetsAround(origin: Coords): VetCandidate[] {
+export function mockVetsAround(origin: Coords): MockVet[] {
   return SPECS.map((spec, i) => {
     const coords = offsetCoords(origin, spec.km, spec.bearing);
     return {
@@ -107,7 +110,7 @@ export function mockVetsAround(origin: Coords): VetCandidate[] {
 export function mockResponseFor(vetId: string, scenario: MockScenario): MockResponse {
   const spec = SPECS.find((s) => s.id === vetId);
   if (!spec) return { kind: 'timeout' };
-  if (scenario === 'nobody') return { kind: 'reject', reason: 'unavailable_today', afterMs: 2000 };
+  if (scenario === 'mock_nobody') return { kind: 'reject', reason: 'unavailable_today', afterMs: 2000 };
   return spec.response;
 }
 

@@ -6,7 +6,9 @@ import { PrimaryButton, SecondaryButton } from '@/components/Buttons';
 import { Card, Field, TextField } from '@/components/Form';
 import { Screen } from '@/components/Screen';
 import { MessageScreen } from '@/components/StatusScreens';
+import { apiErrorMessage } from '@/features/emergency/api';
 import { priceLines } from '@/features/emergency/prices';
+import { finishEmergency, setPaymentStatus } from '@/features/vet/api';
 import { VetCase, currentCase } from '@/features/vet/currentCase';
 import { setVetStatus } from '@/features/vet/vetData';
 import { formatARS } from '@/lib/format';
@@ -48,19 +50,38 @@ function Finish({ vetCase }: { vetCase: VetCase }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function sendAmount() {
+  const emergencyId = offer.emergencyId; // null for a simulated case
+
+  async function sendAmount() {
     const value = Number(amountText.replace(/\D/g, ''));
     if (!value) return setError('Escribí cuánto cobraste.');
     setError(null);
-    setAmount(value);
-    currentCase.finish(value);
-    setStep('payment');
+    setSaving(true);
+    try {
+      if (emergencyId) await finishEmergency(emergencyId, value);
+      setAmount(value);
+      currentCase.finish(value);
+      setStep('payment');
+    } catch (e) {
+      setError(apiErrorMessage(e));
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function markPayment(isPaid: boolean) {
-    currentCase.setPayment(isPaid ? 'paid' : 'pending');
-    setPaid(isPaid);
-    setStep('next');
+  async function markPayment(isPaid: boolean) {
+    setError(null);
+    setSaving(true);
+    try {
+      if (emergencyId && isPaid) await setPaymentStatus(emergencyId, 'paid');
+      currentCase.setPayment(isPaid ? 'paid' : 'pending');
+      setPaid(isPaid);
+      setStep('next');
+    } catch (e) {
+      setError(apiErrorMessage(e));
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function goOn(available: boolean) {
@@ -90,7 +111,7 @@ function Finish({ vetCase }: { vetCase: VetCase }) {
         footer={
           <>
             {errorText}
-            <PrimaryButton size="normal" label="Enviar monto al dueño" onPress={sendAmount} />
+            <PrimaryButton size="normal" label={saving ? 'Enviando…' : 'Enviar monto al dueño'} onPress={sendAmount} disabled={saving} />
             <SecondaryButton label="Volver" onPress={() => router.back()} />
           </>
         }
@@ -113,8 +134,9 @@ function Finish({ vetCase }: { vetCase: VetCase }) {
       <Screen
         footer={
           <>
-            <PrimaryButton size="normal" label="✓ Pago realizado" onPress={() => markPayment(true)} />
-            <SecondaryButton label="Todavía no llegó: cerrar con pago pendiente" onPress={() => markPayment(false)} />
+            {errorText}
+            <PrimaryButton size="normal" label="✓ Pago realizado" onPress={() => markPayment(true)} disabled={saving} />
+            <SecondaryButton label="Todavía no llegó: cerrar con pago pendiente" onPress={() => markPayment(false)} disabled={saving} />
           </>
         }
       >

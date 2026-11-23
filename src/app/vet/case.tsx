@@ -17,7 +17,7 @@ import { colors, font, radius, spacing } from '@/theme';
 export default function VetCaseScreen() {
   const [vetCase] = useState(currentCase.get);
 
-  if (!vetCase?.acceptedAt) {
+  if (!vetCase?.acceptedAt || !vetCase.details) {
     return (
       <MessageScreen
         title="No hay una urgencia en curso"
@@ -28,7 +28,7 @@ export default function VetCaseScreen() {
     );
   }
 
-  const { offer, vet } = vetCase;
+  const { offer, vet, details } = vetCase;
   const { lines, total } = priceLines(vet.prices, offer.place, vetCase.acceptedAt);
 
   return (
@@ -36,7 +36,7 @@ export default function VetCaseScreen() {
       scroll
       footer={
         <>
-          <PrimaryButton size="normal" label={`📞 Llamar a ${offer.ownerFirstName}`} onPress={() => callPhone(offer.ownerPhone)} />
+          <PrimaryButton size="normal" label={`📞 Llamar a ${offer.ownerFirstName}`} onPress={() => callPhone(details.ownerPhone)} />
           <SecondaryButton label="Finalizar atención" hint="Cargar el monto final" onPress={() => router.push('/vet/finish')} />
         </>
       }
@@ -46,7 +46,7 @@ export default function VetCaseScreen() {
           <Text style={styles.badgeText}>Aceptaste · Estás como Ocupado</Text>
         </View>
         <Text style={styles.title}>{offer.ownerFirstName}</Text>
-        <Text style={styles.muted}>Tel. {offer.ownerPhone}</Text>
+        <Text style={styles.muted}>Tel. {details.ownerPhone}</Text>
         <Text style={styles.small}>Llamalo para saber qué le pasa a la mascota y coordinar.</Text>
       </View>
 
@@ -61,8 +61,8 @@ export default function VetCaseScreen() {
         ) : (
           <>
             <Text style={styles.cardValue}>Andá a su ubicación · {formatKm(offer.distanceKm)}</Text>
-            {offer.reference ? <Text style={styles.body}>{offer.reference}</Text> : null}
-            <SecondaryButton label="Abrir en Mapas" onPress={() => openInMaps(offer.ownerCoords)} />
+            {details.reference ? <Text style={styles.body}>{details.reference}</Text> : null}
+            <SecondaryButton label="Abrir en Mapas" onPress={() => openInMaps(details.ownerCoords)} />
           </>
         )}
       </Card>
