@@ -35,11 +35,11 @@ Known limit: alerts that wake a vet while the app is **closed** (push notificati
 - Vet: profile (how they work + prices + bank details), available/unavailable switch, incoming emergency with Accept/Reject, close the case + payment, back on call or end shift.
 - Matching by distance + how the vet works (home visits / clinic).
 
-**Out (later):** appointments ("Sacar turno" shows as "Próximamente"), card / Mercado Pago payments, case history, live location sharing, scheduled shifts, push notifications when the app is closed, vet license verification, app store release.
+**Out (later):** card / Mercado Pago payments, case history, live location sharing, scheduled shifts, push notifications when the app is closed, vet license verification, app store release.
 
 ## 5. Owner flow
 
-1. Home: big **"EMERGENCIA VETERINARIA"** button. Small: "Sacar turno" (próximamente), "Perfil".
+1. Home: big **"EMERGENCIA VETERINARIA"** button. Small: "Sacar turno" (see §6b), "Perfil".
 2. **First time only** — minimal setup: name, phone, location (GPS pin, movable, or typed address), *"¿Tenés cómo trasladar a tu mascota?"* Sí / No. Saved for next time. No email/password: anonymous account.
 3. **Confirm screen** (configurable, to validate with vets later): *"Estás en {zona} · Transporte: Sí"* + big **"Pedir ayuda ahora"**. Location is re-detected each time; transport can be changed right there.
 4. **Searching screen**: "Buscando veterinario…" + who is being contacted + **Cancelar**.
@@ -59,6 +59,20 @@ Known limit: alerts that wake a vet while the app is **closed** (push notificati
 5. **Finalizar atención** → enter final amount → owner sees payment screen.
 6. **Pago realizado** (when the transfer arrives) — or close with payment still **pendiente** without marking it paid.
 7. *"¿Querés volver a estar disponible?"* → **Volver a guardia** / **Terminar mi guardia**.
+
+## 6b. Appointments ("Sacar turno") ✅
+
+Scheduled visits, not emergencies. Decided 2026-11-22.
+
+- **Vet sets their hours:** weekly time ranges per day, each one at the **clinic** or **home visits** (e.g. Mon–Fri 9–13 clinic, Sat 10–14 home). Plus the length of each appointment (20 / 30 / 45 / 60 min) and a **separate price** ("Consulta con turno"); the home visit extra still applies.
+- **Owner books:** chooses clinic or home → sees nearby vets who offer that (clinic within 30 km; home visits within the vet's max distance, measured from their clinic or last known location) with price → picks a day and a free time → optional reason → booked right away (no vet confirmation: the vet published those hours).
+- **Free times** = the vet's hours minus anything already booked (by any owner or by the vet), from 1 h ahead up to 14 days. The server prevents double booking.
+- **Phone bookings:** the vet can add an appointment by hand (name, phone, note) for people who called; it blocks that time like any other.
+- **Both can cancel.** The time becomes free again.
+- **After the visit:** the vet enters the final amount → same payment as emergencies (owner sees amount + alias, "Pago realizado"; or pending, marked later).
+- Screens: owner "Mis turnos" (upcoming + payments pending), vet "Mi agenda" (upcoming list, "Mis horarios", "Agregar turno").
+- Not yet: reminders before the appointment, notifying the other side live when one cancels (they see it next time they open the list), prefilling the final amount with the appointment price.
+- Built in `supabase/migrations/20261125000000_appointments.sql` (overlaps blocked by a database constraint) + `src/features/appointments/`, owner `book` / `appointments`, vet `agenda` / `agenda-add` / `appointment` / `schedule`.
 
 ## 7. Matching rules (defaults, all configurable)
 

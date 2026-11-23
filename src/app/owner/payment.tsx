@@ -1,5 +1,5 @@
 import * as Clipboard from 'expo-clipboard';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
@@ -7,17 +7,24 @@ import { PrimaryButton, SecondaryButton } from '@/components/Buttons';
 import { Card } from '@/components/Form';
 import { Screen } from '@/components/Screen';
 import { MessageScreen } from '@/components/StatusScreens';
+import { getAppointmentPayment } from '@/features/appointments/api';
 import { PaymentDetails, apiErrorMessage, getPaymentDetails } from '@/features/emergency/api';
 import { currentEmergency } from '@/features/emergency/currentEmergency';
 import { useEmergencyStatus } from '@/features/emergency/useEmergencyStatus';
 import { formatARS } from '@/lib/format';
 import { colors, font, radius, spacing } from '@/theme';
 
+// How often an appointment's payment is re-checked (emergencies update live instead).
+const APPOINTMENT_POLL_MS = 5000;
+
 // The vet finished: what to pay and where to transfer. One main action: copy the alias.
+// Works for an emergency (the one in progress) or an appointment (?appointment=<id>).
 export default function PaymentScreen() {
+  const { appointment } = useLocalSearchParams<{ appointment?: string }>();
   const [emergency] = useState(currentEmergency.get);
   const emergencyId = emergency?.emergencyId;
 
+  if (appointment) return <Payment appointmentId={appointment} />;
   if (!emergencyId) {
     return (
       <MessageScreen
@@ -31,17 +38,24 @@ export default function PaymentScreen() {
   return <Payment emergencyId={emergencyId} />;
 }
 
-function Payment({ emergencyId }: { emergencyId: string }) {
+function Payment({ emergencyId, appointmentId }: { emergencyId?: string; appointmentId?: string }) {
   const [details, setDetails] = useState<PaymentDetails | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const live = useEmergencyStatus(emergencyId);
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    if (!appointmentId) return;
+    const t = setInterval(() => setTick((n) => n + 1), APPOINTMENT_POLL_MS);
+    return () => clearInterval(t);
+  }, [appointmentId]);
 
   // Load once, and again whenever the vet changes something (e.g. marks it paid).
-  const liveKey = live ? `${live.status}/${live.payment_status}/${live.final_amount}` : '';
+  const liveKey = live ? `${live.status}/${live.payment_status}/${live.final_amount}` : String(tick);
   useEffect(() => {
     let cancelled = false;
-    getPaymentDetails(emergencyId)
+    (appointmentId ? getAppointmentPayment(appointmentId) : getPaymentDetails(emergencyId!))
       .then((d) => {
         if (cancelled) return;
         if (d) setDetails(d);
@@ -53,7 +67,7 @@ function Payment({ emergencyId }: { emergencyId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [emergencyId, liveKey]);
+  }, [emergencyId, appointmentId, liveKey]);
 
   useEffect(() => {
     if (!copied) return;
@@ -62,6 +76,7 @@ function Payment({ emergencyId }: { emergencyId: string }) {
   }, [copied]);
 
   function leave() {
+    if (appointmentId) return router.back();
     currentEmergency.clear();
     router.dismissTo('/owner');
   }
@@ -98,7 +113,7 @@ function Payment({ emergencyId }: { emergencyId: string }) {
           {!paid && main ? (
             <PrimaryButton size="normal" label={`Copiar ${main.label.toLowerCase()}`} onPress={() => copy(main.label, main.value)} />
           ) : null}
-          <SecondaryButton label="Volver al inicio" onPress={leave} />
+          <SecondaryButton label={appointmentId ? "Volver" : "Volver al inicio"} onPress={leave} />
         </>
       }
     >

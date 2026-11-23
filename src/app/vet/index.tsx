@@ -122,6 +122,7 @@ export default function VetHome() {
 
   const footer = (
     <>
+      <SecondaryButton label="Mi agenda" hint="Turnos y horarios" onPress={() => router.push('/vet/agenda')} />
       <SecondaryButton label="Mi perfil" hint="Precios, cómo atendés, cobro" onPress={() => router.push('/vet/profile')} />
       <SecondaryButton label="Cambiar de modo" onPress={() => router.push('/?pick=1')} />
     </>

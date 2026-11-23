@@ -26,11 +26,17 @@ export default function RootLayout() {
         <Stack.Screen name="owner/search" options={{ headerShown: false, gestureEnabled: false }} />
         <Stack.Screen name="owner/accepted" options={{ headerShown: false, gestureEnabled: false }} />
         <Stack.Screen name="owner/payment" options={{ headerShown: false, gestureEnabled: false }} />
+        <Stack.Screen name="owner/appointments" options={{ title: 'Mis turnos' }} />
+        <Stack.Screen name="owner/book" options={{ title: 'Sacar turno' }} />
         <Stack.Screen name="vet/index" options={{ title: 'Modo veterinario' }} />
         <Stack.Screen name="vet/profile" options={{ title: 'Mi perfil' }} />
         <Stack.Screen name="vet/offer" options={{ headerShown: false, gestureEnabled: false, presentation: 'fullScreenModal' }} />
         <Stack.Screen name="vet/case" options={{ headerShown: false, gestureEnabled: false }} />
         <Stack.Screen name="vet/finish" options={{ headerShown: false, gestureEnabled: false }} />
+        <Stack.Screen name="vet/agenda" options={{ title: 'Mi agenda' }} />
+        <Stack.Screen name="vet/agenda-add" options={{ title: 'Agregar turno' }} />
+        <Stack.Screen name="vet/appointment" options={{ title: 'Turno' }} />
+        <Stack.Screen name="vet/schedule" options={{ title: 'Mis horarios' }} />
       </Stack>
     </SessionProvider>
   );

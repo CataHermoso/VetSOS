@@ -35,6 +35,7 @@ export default function VetProfileScreen() {
   const [base, setBase] = useState('');
   const [homeExtra, setHomeExtra] = useState('');
   const [nightExtra, setNightExtra] = useState('');
+  const [appointmentPrice, setAppointmentPrice] = useState('');
   const [alias, setAlias] = useState('');
   const [cbu, setCbu] = useState('');
   const [holder, setHolder] = useState('');
@@ -56,6 +57,7 @@ export default function VetProfileScreen() {
         setBase(fromAmount(p.prices.base));
         setHomeExtra(fromAmount(p.prices.homeExtra));
         setNightExtra(fromAmount(p.prices.nightExtra));
+        setAppointmentPrice(fromAmount(p.prices.appointment));
         setAlias(p.bank.alias);
         setCbu(p.bank.cbuCvu);
         setHolder(p.bank.holder);
@@ -114,7 +116,7 @@ export default function VetProfileScreen() {
         clinicAddress,
         clinicCoords: coords,
         maxHomeKm: km || 10,
-        prices: { base: toAmount(base), homeExtra: toAmount(homeExtra) ?? 0, nightExtra: toAmount(nightExtra) ?? 0 },
+        prices: { base: toAmount(base), homeExtra: toAmount(homeExtra) ?? 0, nightExtra: toAmount(nightExtra) ?? 0, appointment: toAmount(appointmentPrice) },
         bank: { alias, cbuCvu: cbu, holder, bankName },
       };
       await saveVetProfile(userId, profile);
@@ -224,6 +226,9 @@ export default function VetProfileScreen() {
       ) : null}
       <Field label="Recargo nocturno / fin de semana" hint="Dejalo vacío si no cobrás recargo.">
         <TextField value={nightExtra} onChangeText={setNightExtra} keyboardType="number-pad" placeholder="$ 0" />
+      </Field>
+      <Field label="Consulta con turno" hint="Lo que cobrás por un turno programado (sin urgencia). Dejalo vacío si no das turnos.">
+        <TextField value={appointmentPrice} onChangeText={setAppointmentPrice} keyboardType="number-pad" placeholder="$ 15000" />
       </Field>
 
       <Section title="Datos para cobrar" hint="Al terminar, el dueño ve estos datos para transferirte." />

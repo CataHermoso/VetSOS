@@ -12,7 +12,7 @@ export type VetProfile = {
   clinicAddress: string;
   clinicCoords: Coords | null;
   maxHomeKm: number;
-  prices: { base: number | null; homeExtra: number | null; nightExtra: number | null };
+  prices: { base: number | null; homeExtra: number | null; nightExtra: number | null; /** "Consulta con turno"; null = no appointments */ appointment: number | null };
   bank: { alias: string; cbuCvu: string; holder: string; bankName: string };
 };
 
@@ -58,7 +58,7 @@ export async function loadVet(userId: string): Promise<VetState> {
       clinicAddress: v?.clinic_address ?? '',
       clinicCoords: v?.clinic_lat != null && v?.clinic_lng != null ? { lat: v.clinic_lat, lng: v.clinic_lng } : null,
       maxHomeKm: v?.max_home_km ?? 10,
-      prices: { base: v?.price_base ?? null, homeExtra: v?.price_home_extra ?? null, nightExtra: v?.price_night_extra ?? null },
+      prices: { base: v?.price_base ?? null, homeExtra: v?.price_home_extra ?? null, nightExtra: v?.price_night_extra ?? null, appointment: v?.price_appointment ?? null },
       bank: {
         alias: v?.bank_alias ?? '',
         cbuCvu: v?.bank_cbu_cvu ?? '',
@@ -92,6 +92,7 @@ export async function saveVetProfile(userId: string, p: VetProfile): Promise<voi
     price_base: p.prices.base,
     price_home_extra: home ? p.prices.homeExtra : null,
     price_night_extra: p.prices.nightExtra,
+    price_appointment: p.prices.appointment,
     bank_alias: p.bank.alias.trim() || null,
     bank_cbu_cvu: p.bank.cbuCvu.replace(/\D/g, '') || null,
     bank_holder: p.bank.holder.trim(),
