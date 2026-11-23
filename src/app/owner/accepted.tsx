@@ -73,7 +73,7 @@ export default function AcceptedScreen() {
           <>
             <Text style={styles.cardValue}>Llevá a tu mascota a su consultorio</Text>
             <Text style={styles.body}>{vet.clinic.address}</Text>
-            <SecondaryButton label="Abrir en Mapas" onPress={() => openInMaps(vet.clinic!.coords)} />
+            <SecondaryButton label="Abrir en Google Maps" onPress={() => openInMaps(vet.clinic!.coords)} />
           </>
         ) : (
           <>

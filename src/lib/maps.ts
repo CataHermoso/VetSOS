@@ -1,14 +1,13 @@
-import { Linking, Platform } from 'react-native';
+import { Linking } from 'react-native';
 
 import { Coords } from './geo';
 
-/** Directions in the phone's maps app (Apple Maps on iPhone, Google Maps elsewhere). */
+/**
+ * Directions in Google Maps, on every phone. This link opens the Google Maps app
+ * if it's installed (iPhone and Android), or Google Maps in the browser if not.
+ */
 export function openInMaps({ lat, lng }: Coords) {
-  const url =
-    Platform.OS === 'ios'
-      ? `https://maps.apple.com/?daddr=${lat},${lng}`
-      : `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
-  Linking.openURL(url);
+  Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`);
 }
 
 /** Start a normal phone call. */

@@ -16,7 +16,7 @@ Pitch line: *"Los veterinarios ofrecen guardias de urgencia sin tener que quedar
 | App | **React Native + Expo** (TypeScript) | One codebase for iPhone, Android **and web** (the July demo comes from the same code). |
 | Testing on iPhone | **Expo Go** app | Scan a QR from the dev server, runs on your phone. No Mac, no Apple developer account needed to start. |
 | Backend | **Supabase** (free tier) | Postgres database, login (incl. anonymous login), realtime updates, server functions. |
-| Maps | Native maps view + "open in Google Maps / Apple Maps" | Free; no paid map API needed for the MVP. |
+| Maps | Native maps view + "open in Google Maps" (all phones) | Free; no paid map API needed for the MVP. |
 | Calls | Normal phone call via `tel:` link | Free. No Twilio. |
 
 Known limit: alerts that wake a vet while the app is **closed** (push notifications) need a development build later, which on iPhone requires an Apple Developer account (USD 99/year). For the MVP, the vet gets the alert in the app while it's open.
@@ -101,8 +101,8 @@ Care, payment and vet availability are **three separate states**; the UI makes t
 1. ✅ **Setup** — Expo project, runs on iPhone via Expo Go, base theme (white/violet), navigation.
 2. ✅ **Supabase** — project, tables, anonymous login, owner/vet role pick.
 3. ✅ **Owner flow (mock data)** — setup, confirm, search (reject / no answer / try next / widen radius / clinics outside the network), cancel, accepted screen with prices. Fake vets in `src/features/emergency/mockVets.ts`; open settings in `src/config.ts`.
-   - Deferred: movable map pin and the small map on the accepted screen (need `react-native-maps`, which doesn't run on web; add with a native/web split). For now: GPS + optional address text + "Abrir en Mapas".
-4. ✅ **Vet flow (mock data)** — profile (how they work, prices, bank details; required before going on call), availability switch (saves location), incoming emergency with countdown + vibration, Aceptar / Rechazar with reasons (30-min pause, unavailable today, too far), timeout, accepted case (Llamar, Abrir en Mapas, reference price), finish (final amount → paid / pending → back on call or end shift). Fake incoming emergencies in `src/features/vet/mockOffer.ts`, triggered by a dev-only "Simular urgencia entrante" button.
+   - Deferred: movable map pin and the small map on the accepted screen (need `react-native-maps`, which doesn't run on web; add with a native/web split). For now: GPS + optional address text + "Abrir en Google Maps".
+4. ✅ **Vet flow (mock data)** — profile (how they work, prices, bank details; required before going on call), availability switch (saves location), incoming emergency with countdown + vibration, Aceptar / Rechazar with reasons (30-min pause, unavailable today, too far), timeout, accepted case (Llamar, Abrir en Google Maps, reference price), finish (final amount → paid / pending → back on call or end shift). Fake incoming emergencies in `src/features/vet/mockOffer.ts`, triggered by a dev-only "Simular urgencia entrante" button.
    - Profile, status, location and the 30-min pause are saved in Supabase for real. The emergency itself lives in memory until milestone 5; the owner doesn't see the final amount or bank details until milestone 6.
    - Deferred: alert sound (needs an audio file and a library; vibration only for now; real alerts come with push notifications).
 5. ✅ **Real matching** — `emergencies` + `emergency_offers` tables; all changes go through server functions (`supabase/migrations/20261123000000_emergencies_and_offers.sql`). Offers arrive live (Supabase Realtime) with polling as a safety net; 45 s answer window; reject reasons applied on the server; atomic accept (one vet per emergency, one emergency per vet); owner cancel reaches the vet; the vet's case is restored after closing the app.

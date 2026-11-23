@@ -62,7 +62,7 @@ export default function VetCaseScreen() {
           <>
             <Text style={styles.cardValue}>Andá a su ubicación · {formatKm(offer.distanceKm)}</Text>
             {details.reference ? <Text style={styles.body}>{details.reference}</Text> : null}
-            <SecondaryButton label="Abrir en Mapas" onPress={() => openInMaps(details.ownerCoords)} />
+            <SecondaryButton label="Abrir en Google Maps" onPress={() => openInMaps(details.ownerCoords)} />
           </>
         )}
       </Card>
