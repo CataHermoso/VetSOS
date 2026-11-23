@@ -111,6 +111,6 @@ Care, payment and vet availability are **three separate states**; the UI makes t
    - "Nobody left in this radius" keeps the emergency as `searching` (the owner can widen it), instead of a `no_vets` status.
    - The vet already saves the final amount and payment status on the server; the owner's payment screen comes in milestone 6.
    - Simulated vets stay available in development ("Falsos" on the confirm screen, "Simular urgencia entrante" for vets).
-6. **Close & pay** — final amount, payment screen, "Pago realizado", back on call.
+6. ✅ **Close & pay** — the vet enters the final amount → the owner's screen switches live to the payment screen (amount, alias / CBU / CVU, holder, bank, **Copiar alias**) → "Pago realizado" shows "✓ Pago confirmado" to the owner. The vet can close with payment pending and mark it later ("Pagos pendientes" on the vet home). The owner's home shows an emergency that still needs them (vet on the way, or payment pending in the last 24 h) so closing the app loses nothing. Server function in `supabase/migrations/20261124000000_payment_details.sql`.
 7. **Polish & test** — two phones running a full emergency end-to-end.
 8. **Web build** — same app running in the browser for the July demo (QR → open link).

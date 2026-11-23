@@ -12,6 +12,7 @@ App that connects pet owners in an emergency with vets who volunteer to be on ca
 3. **SQL Editor → New query** → paste all of each file in [supabase/migrations/](supabase/migrations/), **in order**, and **Run** each one:
    1. `20261122000000_profiles_and_vets.sql` — profiles, owner settings, vets
    2. `20261123000000_emergencies_and_offers.sql` — emergencies, offers to vets, matching and the accept lock
+   3. `20261124000000_payment_details.sql` — what the owner sees to pay once the vet finishes
 4. Click **Connect** (top of the project) → **Framework** → pick **Expo React Native** in the Framework dropdown (or any framework: the URL and key are the same, only the variable prefix changes) → copy the URL and the publishable key into `.env.local` (copy `.env.example` if it doesn't exist). `.env.local` is never committed.
 5. Restart `npx expo start`.
 

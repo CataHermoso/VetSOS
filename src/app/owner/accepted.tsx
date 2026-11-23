@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { PrimaryButton, SecondaryButton } from '@/components/Buttons';
@@ -9,6 +9,7 @@ import { Screen } from '@/components/Screen';
 import { MessageScreen } from '@/components/StatusScreens';
 import { currentEmergency } from '@/features/emergency/currentEmergency';
 import { priceLines } from '@/features/emergency/prices';
+import { useEmergencyStatus } from '@/features/emergency/useEmergencyStatus';
 import { formatKm } from '@/lib/geo';
 import { callPhone, openInMaps } from '@/lib/maps';
 import { colors, font, radius, spacing } from '@/theme';
@@ -17,6 +18,13 @@ import { colors, font, radius, spacing } from '@/theme';
 export default function AcceptedScreen() {
   const [emergency] = useState(currentEmergency.get);
   const accepted = emergency?.accepted;
+
+  // Real emergencies: when the vet finishes the case, show what to pay.
+  const live = useEmergencyStatus(emergency?.emergencyId);
+  const finished = live?.status === 'finished';
+  useEffect(() => {
+    if (finished) router.replace('/owner/payment');
+  }, [finished]);
 
   if (!emergency || !accepted) {
     return (
@@ -54,6 +62,9 @@ export default function AcceptedScreen() {
         </View>
         <Text style={styles.title}>{vet.name}</Text>
         <Text style={styles.muted}>A {formatKm(km)} de vos · Tel. {vet.phone}</Text>
+        {emergency.emergencyId ? (
+          <Text style={styles.small}>Cuando termine la atención, acá te aparece el monto final y cómo pagarle.</Text>
+        ) : null}
       </View>
 
       <Card>
@@ -103,6 +114,11 @@ const styles = StyleSheet.create({
   muted: {
     fontSize: font.body,
     color: colors.textMuted,
+  },
+  small: {
+    fontSize: font.small,
+    color: colors.textMuted,
+    textAlign: 'center',
   },
   cardLabel: {
     fontSize: font.small,

@@ -8,6 +8,7 @@ import { Screen } from '@/components/Screen';
 import { MessageScreen } from '@/components/StatusScreens';
 import { getVetCase, offerFromRow } from '@/features/vet/api';
 import { currentCase, snapshotOf } from '@/features/vet/currentCase';
+import { PendingPayments } from '@/features/vet/PendingPayments';
 import { useIncomingOffers } from '@/features/vet/useIncomingOffers';
 import { mockOfferFor } from '@/features/vet/mockOffer';
 import { VetState, clearSnooze, isVetProfileComplete, loadVet, setVetStatus } from '@/features/vet/vetData';
@@ -208,6 +209,8 @@ export default function VetHome() {
             <SecondaryButton label="Simular urgencia entrante" onPress={simulateOffer} />
           </Card>
         ) : null}
+
+        <PendingPayments userId={userId} />
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
       </View>

@@ -25,6 +25,7 @@ export default function RootLayout() {
         <Stack.Screen name="owner/confirm" options={{ title: 'Emergencia' }} />
         <Stack.Screen name="owner/search" options={{ headerShown: false, gestureEnabled: false }} />
         <Stack.Screen name="owner/accepted" options={{ headerShown: false, gestureEnabled: false }} />
+        <Stack.Screen name="owner/payment" options={{ headerShown: false, gestureEnabled: false }} />
         <Stack.Screen name="vet/index" options={{ title: 'Modo veterinario' }} />
         <Stack.Screen name="vet/profile" options={{ title: 'Mi perfil' }} />
         <Stack.Screen name="vet/offer" options={{ headerShown: false, gestureEnabled: false, presentation: 'fullScreenModal' }} />

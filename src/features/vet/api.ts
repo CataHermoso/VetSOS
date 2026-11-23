@@ -103,3 +103,26 @@ export async function touchVet(userId: string): Promise<void> {
   const { error } = await supabase.from('vets').update({ last_seen_at: new Date().toISOString() }).eq('profile_id', userId);
   if (error) throw error;
 }
+
+export type PendingPayment = { emergencyId: string; ownerFirstName: string; amount: number; finishedAt: Date };
+
+/** Cases this vet closed with the payment still pending (last 7 days). */
+export async function fetchPendingPayments(userId: string): Promise<PendingPayment[]> {
+  const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await supabase
+    .from('emergencies')
+    .select('id, final_amount, finished_at, emergency_offers(owner_first_name, vet_id)')
+    .eq('assigned_vet_id', userId)
+    .eq('status', 'finished')
+    .eq('payment_status', 'pending')
+    .gt('finished_at', since)
+    .order('finished_at', { ascending: false });
+  if (error) throw error;
+  type Row = { id: string; final_amount: number | null; finished_at: string; emergency_offers: { owner_first_name: string; vet_id: string }[] };
+  return ((data ?? []) as Row[]).map((r) => ({
+    emergencyId: r.id,
+    ownerFirstName: r.emergency_offers.find((o) => o.vet_id === userId)?.owner_first_name ?? 'Dueño/a',
+    amount: r.final_amount ?? 0,
+    finishedAt: new Date(r.finished_at),
+  }));
+}

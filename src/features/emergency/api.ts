@@ -130,3 +130,74 @@ export async function getAssignedVet(
     place: r.place,
   };
 }
+
+/** The parts of an emergency row the owner's screens care about. */
+export type EmergencyRow = {
+  id: string;
+  lat: number;
+  lng: number;
+  has_transport: boolean;
+  status: 'searching' | 'offered' | 'accepted' | 'finished' | 'cancelled';
+  payment_status: 'none' | 'pending' | 'paid';
+  final_amount: number | null;
+  created_at: string;
+};
+
+const EMERGENCY_COLUMNS = 'id, lat, lng, has_transport, status, payment_status, final_amount, created_at';
+
+export async function fetchEmergency(emergencyId: string): Promise<EmergencyRow | null> {
+  const { data, error } = await supabase.from('emergencies').select(EMERGENCY_COLUMNS).eq('id', emergencyId).maybeSingle();
+  if (error) throw error;
+  return data as EmergencyRow | null;
+}
+
+/**
+ * The owner's emergency that still needs them: a vet is on the way, or the case is
+ * finished but not paid yet (last 24 h). Lets the owner come back after closing the app.
+ */
+export async function fetchOwnerActiveEmergency(userId: string): Promise<EmergencyRow | null> {
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await supabase
+    .from('emergencies')
+    .select(EMERGENCY_COLUMNS)
+    .eq('owner_id', userId)
+    .gt('created_at', since)
+    .or('status.eq.accepted,and(status.eq.finished,payment_status.eq.pending)')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data as EmergencyRow | null;
+}
+
+export type PaymentDetails = {
+  vetName: string;
+  vetPhone: string;
+  finalAmount: number;
+  paymentStatus: 'pending' | 'paid';
+  bank: { alias: string; cbuCvu: string; holder: string; bankName: string };
+};
+
+/** Final amount and the vet's bank details. Only for the owner, only once the vet finished. */
+export async function getPaymentDetails(emergencyId: string): Promise<PaymentDetails | null> {
+  const { data, error } = await supabase.rpc('get_payment_details', { p_emergency_id: emergencyId });
+  if (error) throw error;
+  const r = first<{
+    vet_name: string;
+    vet_phone: string | null;
+    final_amount: number | null;
+    payment_status: 'pending' | 'paid';
+    bank_alias: string | null;
+    bank_cbu_cvu: string | null;
+    bank_holder: string | null;
+    bank_name: string | null;
+  }>(data);
+  if (!r) return null;
+  return {
+    vetName: r.vet_name,
+    vetPhone: r.vet_phone ?? '',
+    finalAmount: r.final_amount ?? 0,
+    paymentStatus: r.payment_status,
+    bank: { alias: r.bank_alias ?? '', cbuCvu: r.bank_cbu_cvu ?? '', holder: r.bank_holder ?? '', bankName: r.bank_name ?? '' },
+  };
+}
