@@ -62,10 +62,20 @@ export default function OwnerHome() {
           <Text style={styles.activeTitle}>
             {active.status === 'accepted'
               ? 'Tenés una urgencia en curso'
-              : `Falta pagar ${formatARS(active.final_amount ?? 0)}`}
+              : active.status === 'finished'
+                ? `Falta pagar ${formatARS(active.final_amount ?? 0)}`
+                : 'Tu búsqueda de veterinario sigue abierta'}
           </Text>
           <SecondaryButton
-            label={opening ? 'Abriendo…' : active.status === 'accepted' ? 'Ver veterinario' : 'Ver datos para pagar'}
+            label={
+              opening
+                ? 'Abriendo…'
+                : active.status === 'accepted'
+                  ? 'Ver veterinario'
+                  : active.status === 'finished'
+                    ? 'Ver datos para pagar'
+                    : 'Seguir buscando'
+            }
             onPress={openActive}
             disabled={opening}
           />

@@ -19,7 +19,7 @@ export type OfferRow = {
   distance_km: number;
   sent_at: string;
   expires_at: string;
-  response: 'accepted' | 'rejected' | 'timeout' | 'cancelled' | null;
+  response: 'accepted' | 'rejected' | 'timeout' | 'cancelled' | 'released' | null;
   reason: Exclude<RejectReason, 'timeout'> | null;
   responded_at: string | null;
 };
@@ -141,9 +141,10 @@ export type EmergencyRow = {
   payment_status: 'none' | 'pending' | 'paid';
   final_amount: number | null;
   created_at: string;
+  cancelled_by: 'owner' | 'vet' | null;
 };
 
-const EMERGENCY_COLUMNS = 'id, lat, lng, has_transport, status, payment_status, final_amount, created_at';
+const EMERGENCY_COLUMNS = 'id, lat, lng, has_transport, status, payment_status, final_amount, created_at, cancelled_by';
 
 export async function fetchEmergency(emergencyId: string): Promise<EmergencyRow | null> {
   const { data, error } = await supabase.from('emergencies').select(EMERGENCY_COLUMNS).eq('id', emergencyId).maybeSingle();
@@ -152,17 +153,21 @@ export async function fetchEmergency(emergencyId: string): Promise<EmergencyRow 
 }
 
 /**
- * The owner's emergency that still needs them: a vet is on the way, or the case is
- * finished but not paid yet (last 24 h). Lets the owner come back after closing the app.
+ * The owner's emergency that still needs them: a vet is on the way, the case is
+ * finished but not paid yet (last 24 h), or a search still open (last hour, e.g. the
+ * app was closed mid-search or the vet couldn't go). Lets the owner come back after closing the app.
  */
 export async function fetchOwnerActiveEmergency(userId: string): Promise<EmergencyRow | null> {
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const lastHour = new Date(Date.now() - 60 * 60 * 1000).toISOString();
   const { data, error } = await supabase
     .from('emergencies')
     .select(EMERGENCY_COLUMNS)
     .eq('owner_id', userId)
     .gt('created_at', since)
-    .or('status.eq.accepted,and(status.eq.finished,payment_status.eq.pending)')
+    .or(
+      `status.eq.accepted,and(status.eq.finished,payment_status.eq.pending),and(status.in.(searching,offered),created_at.gt.${lastHour})`,
+    )
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();

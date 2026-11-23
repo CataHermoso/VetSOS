@@ -1,21 +1,69 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { StyleSheet, Text, Vibration, View } from 'react-native';
 
 import { PrimaryButton, SecondaryButton } from '@/components/Buttons';
 import { Card } from '@/components/Form';
 import { PriceCard } from '@/components/PriceCard';
 import { Screen } from '@/components/Screen';
 import { MessageScreen } from '@/components/StatusScreens';
+import { apiErrorMessage } from '@/features/emergency/api';
 import { priceLines } from '@/features/emergency/prices';
+import { useEmergencyStatus } from '@/features/emergency/useEmergencyStatus';
+import { releaseEmergency } from '@/features/vet/api';
 import { currentCase } from '@/features/vet/currentCase';
+import { setVetStatus } from '@/features/vet/vetData';
 import { formatKm } from '@/lib/geo';
 import { callPhone, openInMaps } from '@/lib/maps';
+import { useSession } from '@/lib/session';
 import { colors, font, radius, spacing } from '@/theme';
 
 // Accepted emergency: call the owner, get there, then "Finalizar atención".
 export default function VetCaseScreen() {
+  const session = useSession();
+  const userId = session.status === 'ready' ? session.userId : null;
   const [vetCase] = useState(currentCase.get);
+  const [confirmRelease, setConfirmRelease] = useState(false);
+  const [releasing, setReleasing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Real emergencies: notice if the owner cancels ("Ya no necesito ayuda").
+  const live = useEmergencyStatus(vetCase?.offer.emergencyId ?? undefined);
+  const cancelledByOwner = live?.status === 'cancelled';
+  useEffect(() => {
+    if (cancelledByOwner) Vibration.vibrate(400);
+  }, [cancelledByOwner]);
+
+  function leave() {
+    currentCase.clear();
+    router.dismissTo('/vet');
+  }
+
+  /** "No puedo ir": the emergency goes back to the owner, who looks for another vet. */
+  async function release() {
+    if (!vetCase || !userId) return;
+    setReleasing(true);
+    setError(null);
+    try {
+      if (vetCase.offer.emergencyId) await releaseEmergency(vetCase.offer.emergencyId);
+      else await setVetStatus(userId, 'offline', { snoozedUntil: null }); // simulated case
+      leave();
+    } catch (e) {
+      setError(apiErrorMessage(e));
+      setReleasing(false);
+    }
+  }
+
+  if (cancelledByOwner && vetCase) {
+    return (
+      <MessageScreen
+        title={`${vetCase.offer.ownerFirstName} canceló la urgencia`}
+        message="Ya no necesita ayuda. Volviste a estar disponible."
+        actionLabel="Volver al inicio"
+        onAction={leave}
+      />
+    );
+  }
 
   if (!vetCase?.acceptedAt || !vetCase.details) {
     return (
@@ -36,8 +84,26 @@ export default function VetCaseScreen() {
       scroll
       footer={
         <>
+          {error ? <Text style={styles.error}>{error}</Text> : null}
           <PrimaryButton size="normal" label={`📞 Llamar a ${offer.ownerFirstName}`} onPress={() => callPhone(details.ownerPhone)} />
           <SecondaryButton label="Finalizar atención" hint="Cargar el monto final" onPress={() => router.push('/vet/finish')} />
+          {confirmRelease ? (
+            <View style={styles.confirm}>
+              <Text style={styles.confirmText}>
+                ¿No podés ir? Le avisamos a {offer.ownerFirstName} para que busque otro veterinario, y quedás como No disponible.
+              </Text>
+              <View style={styles.confirmRow}>
+                <View style={styles.flex}>
+                  <SecondaryButton label={releasing ? 'Avisando…' : 'Sí, no puedo'} onPress={release} disabled={releasing} />
+                </View>
+                <View style={styles.flex}>
+                  <SecondaryButton label="Cancelar" onPress={() => setConfirmRelease(false)} />
+                </View>
+              </View>
+            </View>
+          ) : (
+            <SecondaryButton label="No puedo ir" onPress={() => setConfirmRelease(true)} />
+          )}
         </>
       }
     >
@@ -73,6 +139,26 @@ export default function VetCaseScreen() {
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
+  confirm: {
+    gap: spacing.sm,
+  },
+  confirmText: {
+    fontSize: font.small,
+    color: colors.text,
+    textAlign: 'center',
+  },
+  confirmRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  error: {
+    color: colors.warning,
+    fontSize: font.small,
+    textAlign: 'center',
+  },
   header: {
     marginTop: spacing.md,
     alignItems: 'center',

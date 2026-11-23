@@ -126,3 +126,9 @@ export async function fetchPendingPayments(userId: string): Promise<PendingPayme
     finishedAt: new Date(r.finished_at),
   }));
 }
+
+/** "No puedo ir": give an accepted emergency back; the owner can look for another vet. */
+export async function releaseEmergency(emergencyId: string): Promise<void> {
+  const { error } = await supabase.rpc('release_emergency', { p_emergency_id: emergencyId });
+  if (error) throw error;
+}

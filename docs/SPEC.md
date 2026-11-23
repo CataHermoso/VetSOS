@@ -129,5 +129,5 @@ Care, payment and vet availability are **three separate states**; the UI makes t
 7. **Polish & test** — two phones running a full emergency end-to-end. *(In progress.)*
    - Done: the vet's screen stays on while on call (`expo-keep-awake`), since a locked phone stops receiving emergencies; the owner's phone buzzes when a vet accepts and when the payment screen appears; owner "Perfil" edits their data; the vet's "Pausado" notice clears itself when the 30 min end; form errors show above the save button.
    - Next: whatever comes up testing on the iPhone + computer.
-   - Open question: what happens if the vet accepts but can't go, or the owner no longer needs help after acceptance? Right now neither side can undo an accepted emergency.
+   - ✅ Undoing an accepted emergency (`supabase/migrations/20261126000000_undo_accepted_emergency.sql`): the vet taps **"No puedo ir"** → the emergency goes back to searching, the owner sees "X no puede ir" + **Buscar otro veterinario** (never the same vet again), the vet goes No disponible. The owner taps **"Ya no necesito ayuda"** → cancelled, the vet is told and is back on call. An open search also shows on the owner's home for 1 h ("Seguir buscando") if the app was closed.
 8. **Web build** — same app running in the browser for the July demo (QR → open link).
