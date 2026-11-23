@@ -161,8 +161,8 @@ export default function BookAppointment() {
         ) : vets.length === 0 ? (
           <Text style={styles.muted}>
             {place === 'clinic'
-              ? 'Por ahora no hay veterinarios con turnos en consultorio cerca tuyo.'
-              : 'Por ahora no hay veterinarios con turnos a domicilio que lleguen a tu zona.'}
+              ? 'Por ahora no hay veterinarios con turnos en consultorio a menos de 30 km de tu ubicación guardada. Probá con "En mi casa".'
+              : 'Por ahora no hay veterinarios con turnos a domicilio que lleguen a tu ubicación guardada. Probá con "En el consultorio".'}
           </Text>
         ) : (
           vets.map((v) => (
